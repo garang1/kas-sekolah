@@ -247,7 +247,7 @@ fun HeaderSchoolBanner(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Ganti",
+                                    text = "Edit",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,

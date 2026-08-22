@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,25 +17,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,10 +44,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,10 +67,6 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
@@ -88,17 +83,19 @@ fun DashboardScreen(
     onSelectFundFilter: (String) -> Unit = {},
     onLoadNextPage: () -> Unit = {},
     pendingTransactionsCount: Int,
-    onRoleSwitched: (UserRole) -> Unit,
+    onRoleSwitched: (UserRole) -> Unit = {},
     onOpenAccountDialog: () -> Unit = {},
     onOpenQrPairing: () -> Unit = {},
     onLockApp: () -> Unit = {},
-    onNavigateToEntry: () -> Unit,
-    onNavigateToApproval: () -> Unit,
-    onViewReceipt: (TransactionEntity) -> Unit,
-    onDeleteTransaction: (TransactionEntity) -> Unit
+    onNavigateToEntry: () -> Unit = {},
+    onNavigateToApproval: () -> Unit = {},
+    onViewReceipt: (TransactionEntity) -> Unit = {},
+    onEditTransaction: (TransactionEntity) -> Unit = {},
+    onDeleteTransaction: (TransactionEntity) -> Unit = {}
 ) {
     val activeSources = if (fundSources.isNotEmpty()) fundSources else fundBalances.map { it.fundSource }.ifEmpty { FundSourceDefaults.SOURCES }
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
+    var transactionToEdit by remember { mutableStateOf<TransactionEntity?>(null) }
 
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
         maximumFractionDigits = 0
@@ -298,11 +295,23 @@ fun DashboardScreen(
                         transaction = tx,
                         currencyFormatter = currencyFormatter,
                         dateFormatter = dateFormatter,
-                        onViewReceipt = { onViewReceipt(tx) },
+                        onEdit = { transactionToEdit = tx },
                         onDelete = { transactionToDelete = tx }
                     )
                 }
             }
+        }
+
+        transactionToEdit?.let { tx ->
+            com.example.ui.components.EditTransactionDialog(
+                transaction = tx,
+                fundSources = activeSources,
+                onDismiss = { transactionToEdit = null },
+                onSave = { updatedTx ->
+                    transactionToEdit = null
+                    onEditTransaction(updatedTx)
+                }
+            )
         }
 
         transactionToDelete?.let { tx ->
@@ -485,7 +494,7 @@ fun TransactionRowItem(
     transaction: TransactionEntity,
     currencyFormatter: NumberFormat,
     dateFormatter: SimpleDateFormat,
-    onViewReceipt: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
@@ -581,14 +590,14 @@ fun TransactionRowItem(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = onViewReceipt,
+                        onClick = onEdit,
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Receipt,
-                            contentDescription = "Nota",
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Transaksi",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 

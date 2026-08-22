@@ -28,28 +28,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -160,7 +144,7 @@ fun SchoolAccountDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Pengaturan Akun & Sekolah",
+                        text = "Pengaturan Akun Dasar",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                 }
@@ -183,26 +167,22 @@ fun SchoolAccountDialog(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Akun", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-                        icon = { Icon(imageVector = Icons.Default.Person, contentDescription = "Akun", modifier = Modifier.size(18.dp)) }
+                        icon = { Icon(imageVector = Icons.Default.Person, contentDescription = "Akun", modifier = Modifier.size(20.dp)) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Sekolah", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-                        icon = { Icon(imageVector = Icons.Default.School, contentDescription = "Profil Sekolah", modifier = Modifier.size(18.dp)) }
+                        icon = { Icon(imageVector = Icons.Default.School, contentDescription = "Profil Sekolah", modifier = Modifier.size(20.dp)) }
                     )
                     Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        text = { Text("Pos Dana", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-                        icon = { Icon(imageVector = Icons.Default.AccountBalanceWallet, contentDescription = "Pos Dana", modifier = Modifier.size(18.dp)) }
+                        icon = { Icon(imageVector = Icons.Default.AccountBalanceWallet, contentDescription = "Pos Dana", modifier = Modifier.size(20.dp)) }
                     )
                     Tab(
                         selected = selectedTab == 3,
                         onClick = { selectedTab = 3 },
-                        text = { Text("Info", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
-                        icon = { Icon(imageVector = Icons.Default.Info, contentDescription = "Info Aplikasi", modifier = Modifier.size(18.dp)) }
+                        icon = { Icon(imageVector = Icons.Default.Info, contentDescription = "Info Aplikasi", modifier = Modifier.size(20.dp)) }
                     )
                 }
 
@@ -633,7 +613,7 @@ fun SchoolAccountDialog(
                     // TAB 3: TENTANG & LISENSI APLIKASI
                     3 -> {
                         AboutScreen(
-                            appName = schoolProfile.schoolName.ifBlank { "Kas Simapas" },
+                            appName = "Kas Simapas",
                             npsn = schoolProfile.npsn
                         )
                     }

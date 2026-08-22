@@ -58,6 +58,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import android.print.PrintAttributes
+import android.print.PrintManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Description
+import com.example.data.model.SchoolProfile
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -105,6 +114,7 @@ import java.util.Locale
 @Composable
 fun RkasScreen(
     fundSources: List<String> = FundSourceDefaults.SOURCES,
+    schoolProfile: SchoolProfile = SchoolProfile(),
     onSyncRkasToSheets: (List<RkasItem>) -> Unit = {},
     onFetchRkasFromSheets: ((List<RkasItem>) -> Unit) -> Unit = {},
     googleSheetsUrl: String = "",
@@ -115,8 +125,67 @@ fun RkasScreen(
     val uriHandler = LocalUriHandler.current
     var rkasHeader by remember { mutableStateOf(RkasDefaults.HEADER) }
     
-    // Master state item Rencana Belanja
-    var rkasItems by remember { mutableStateOf(RkasDefaults.ITEMS) }
+    val prefs = remember { context.getSharedPreferences("rkas_budgets_prefs", Context.MODE_PRIVATE) }
+
+    fun loadSavedRkasItems(): List<RkasItem> {
+        val jsonString = prefs.getString("rkas_items_json", null)
+        if (!jsonString.isNullOrBlank()) {
+            try {
+                val jsonArray = org.json.JSONArray(jsonString)
+                val list = mutableListOf<RkasItem>()
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    list.add(
+                        RkasItem(
+                            id = obj.optInt("id", i + 1),
+                            noUrut = obj.optString("noUrut", "${i + 1}"),
+                            kodeRekening = obj.optString("kodeRekening", ""),
+                            kodeProgram = obj.optString("kodeProgram", ""),
+                            uraian = obj.optString("uraian", ""),
+                            volume = obj.optString("volume", "1"),
+                            satuan = obj.optString("satuan", "buah"),
+                            tarifHarga = obj.optDouble("tarifHarga", 0.0),
+                            jumlah = obj.optDouble("jumlah", 0.0),
+                            isHeader = obj.optBoolean("isHeader", false),
+                            fundSource = obj.optString("fundSource", "BOS Reguler")
+                        )
+                    )
+                }
+                if (list.isNotEmpty()) return list
+            } catch (e: Exception) {
+                Log.e("RkasScreen", "Error parsing saved RKAS items", e)
+            }
+        }
+        return RkasDefaults.ITEMS
+    }
+
+    fun saveRkasItemsToStorage(items: List<RkasItem>) {
+        try {
+            val jsonArray = org.json.JSONArray()
+            items.forEach { item ->
+                val obj = org.json.JSONObject().apply {
+                    put("id", item.id)
+                    put("noUrut", item.noUrut)
+                    put("kodeRekening", item.kodeRekening)
+                    put("kodeProgram", item.kodeProgram)
+                    put("uraian", item.uraian)
+                    put("volume", item.volume)
+                    put("satuan", item.satuan)
+                    put("tarifHarga", item.tarifHarga)
+                    put("jumlah", item.jumlah)
+                    put("isHeader", item.isHeader)
+                    put("fundSource", item.fundSource)
+                }
+                jsonArray.put(obj)
+            }
+            prefs.edit().putString("rkas_items_json", jsonArray.toString()).apply()
+        } catch (e: Exception) {
+            Log.e("RkasScreen", "Error saving RKAS items to internal storage", e)
+        }
+    }
+
+    // Master state item Rencana Belanja (Tersimpan di Penyimpanan Internal)
+    var rkasItems by remember { mutableStateOf(loadSavedRkasItems()) }
     var isPullingFromSheets by remember { mutableStateOf(false) }
 
     // Opsi Buku Kas
@@ -129,8 +198,10 @@ fun RkasScreen(
         mutableStateOf(allBukuKasOptions.firstOrNull() ?: "BOS Reguler") 
     }
 
-    // Persistensi Anggaran per Buku Kas via SharedPreferences
-    val prefs = remember { context.getSharedPreferences("rkas_budgets_prefs", Context.MODE_PRIVATE) }
+    fun updateAndPersistRkasItems(newItems: List<RkasItem>) {
+        rkasItems = newItems
+        saveRkasItemsToStorage(newItems)
+    }
 
     fun loadSavedBudgets(): Map<String, Double> {
         val defaultBudgets = mapOf(
@@ -440,161 +511,85 @@ fun RkasScreen(
                 }
             }
 
-            // 3. Action Buttons & Export / Sync Bar
+            // 3. Action Buttons & Export Bar
             item {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
-                    border = BorderStroke(1.dp, Color(0xFFBBF7D0))
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Prominent Direct Open & Edit in Google Sheets Button
-                        val directOpenUrl = if (spreadsheetDocUrl.isNotBlank()) spreadsheetDocUrl else googleSheetsUrl
-                        Button(
-                            onClick = {
-                                if (directOpenUrl.isBlank()) {
-                                    Toast.makeText(context, "Silakan masukkan Link Google Sheets pada menu 'Pengaturan Akun & Sekolah'", Toast.LENGTH_LONG).show()
-                                } else {
-                                    try {
-                                        val targetUrl = if (!directOpenUrl.startsWith("http://") && !directOpenUrl.startsWith("https://")) {
-                                            "https://$directOpenUrl"
-                                        } else {
-                                            directOpenUrl
-                                        }
-                                        uriHandler.openUri(targetUrl)
-                                        Toast.makeText(context, "Membuka Google Sheets...", Toast.LENGTH_SHORT).show()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Gagal membuka link. Silakan periksa Link Google Sheets Anda.", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669))
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Storage,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "📊 Buka & Edit di Google Sheets",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = if (directOpenUrl.isNotBlank()) "Buka spreadsheet di browser / app Google Sheets untuk edit langsung" else "Link Spreadsheet belum diset (Klik untuk mengatur)",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFFD1FAE5)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Auto-Sync Status Bar
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (googleSheetsUrl.isNotBlank()) Color(0xFFF0FDF4) else Color(0xFFFEF2F2),
-                            border = BorderStroke(1.dp, if (googleSheetsUrl.isNotBlank()) Color(0xFFBBF7D0) else Color(0xFFFECACA)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (googleSheetsUrl.isNotBlank()) Color(0xFF16A34A) else Color(0xFFDC2626),
-                                    modifier = Modifier.size(8.dp)
-                                ) {}
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isPullingFromSheets) "Sedang mengambil data dari Google Sheets..." else if (googleSheetsUrl.isNotBlank()) "Koneksi Google Sheets Aktif" else "Koneksi Google Sheets Nonaktif • Atur URL Web App terlebih dahulu",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (googleSheetsUrl.isNotBlank()) Color(0xFF166534) else Color(0xFF991B1B)
-                                )
-                            }
-                        }
-
-                        // Sync Action Buttons: Ambil dari Sheet & Kirim ke Sheet
+                        // Action Buttons: Cetak PDF & Ekspor CSV
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
                                 onClick = {
-                                    if (googleSheetsUrl.isNotBlank()) {
-                                        isPullingFromSheets = true
-                                        onFetchRkasFromSheets { fetchedItems ->
-                                            isPullingFromSheets = false
-                                            if (fetchedItems.isNotEmpty()) {
-                                                rkasItems = fetchedItems
-                                                Toast.makeText(context, "Berhasil memuat ${fetchedItems.size} item RKAS dari Google Sheets", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "Tidak ada data RKAS ditemukan di spreadsheet", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    } else {
-                                        Toast.makeText(context, "URL Database Google Sheets belum diatur", Toast.LENGTH_SHORT).show()
-                                    }
+                                    generateAndPrintRkasPdf(
+                                        context = context,
+                                        header = rkasHeader,
+                                        items = filteredItems,
+                                        selectedBukuKas = selectedBukuKasFilter,
+                                        totalRevenue = currentAllocatedRevenue,
+                                        totalExpenditure = totalPlannedExpenditure,
+                                        remainingBalance = remainingBalance,
+                                        schoolProfile = schoolProfile
+                                    )
                                 },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                            ) {
+                                Icon(Icons.Default.PictureAsPdf, contentDescription = "Cetak PDF", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Cetak PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { exportRkasToCsv(context, rkasHeader, rkasItems) },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
                             ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(if (isPullingFromSheets) "Memuat..." else "Ambil dari Sheet", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.Download, contentDescription = "Ekspor CSV", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Ekspor CSV", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
+                        }
 
+                        // Secondary Action Buttons: Bagikan Ringkasan & Reset Data
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             OutlinedButton(
                                 onClick = {
-                                    if (googleSheetsUrl.isNotBlank()) {
-                                        onSyncRkasToSheets(rkasItems)
-                                        Toast.makeText(context, "Data RKAS sedang dikirim ke Google Sheets", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "URL Database Google Sheets belum diatur", Toast.LENGTH_SHORT).show()
-                                    }
+                                    shareRkasSummary(
+                                        context = context,
+                                        header = rkasHeader,
+                                        totalRevenue = currentAllocatedRevenue,
+                                        totalExpenditure = totalPlannedExpenditure,
+                                        bukuKasName = selectedBukuKasFilter
+                                    )
                                 },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
                                 Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Kirim ke Sheet", fontSize = 11.sp)
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { exportRkasToCsv(context, rkasHeader, rkasItems) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Ekspor CSV", fontSize = 11.sp)
+                                Text("Bagikan", fontSize = 11.sp)
                             }
 
                             Button(
                                 onClick = { showResetRkasDialog = true },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(0.85f),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
                             ) {
@@ -881,6 +876,7 @@ fun RkasScreen(
                                 fundSource = inputBukuKas
                             )
                             rkasItems = rkasItems + newItem
+                            saveRkasItemsToStorage(rkasItems)
                             Toast.makeText(context, "Berhasil menambah belanja di Buku Kas: $inputBukuKas", Toast.LENGTH_SHORT).show()
                         } else {
                             // Update Existing Item
@@ -897,6 +893,7 @@ fun RkasScreen(
                                 } else old
                             }
                             rkasItems = updatedItems
+                            saveRkasItemsToStorage(updatedItems)
                             Toast.makeText(context, "Rencana belanja berhasil diperbarui!", Toast.LENGTH_SHORT).show()
                         }
 
@@ -929,7 +926,9 @@ fun RkasScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        rkasItems = rkasItems.filterNot { it.id == target.id }
+                        val remaining = rkasItems.filterNot { it.id == target.id }
+                        rkasItems = remaining
+                        saveRkasItemsToStorage(remaining)
                         itemToDelete = null
                         Toast.makeText(context, "Item belanja berhasil dihapus", Toast.LENGTH_SHORT).show()
                     },
@@ -963,6 +962,7 @@ fun RkasScreen(
                     onClick = {
                         showResetRkasDialog = false
                         rkasItems = emptyList()
+                        saveRkasItemsToStorage(emptyList())
                         Toast.makeText(context, "Seluruh daftar belanja dikosongkan (Rp 0).", Toast.LENGTH_LONG).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
@@ -1326,4 +1326,131 @@ private fun shareRkasSummary(
         putExtra(Intent.EXTRA_TEXT, summaryText)
     }
     context.startActivity(Intent.createChooser(intent, "Bagikan Ringkasan Belanja Kas"))
+}
+
+private fun generateAndPrintRkasPdf(
+    context: Context,
+    header: RkasHeader,
+    items: List<RkasItem>,
+    selectedBukuKas: String,
+    totalRevenue: Double,
+    totalExpenditure: Double,
+    remainingBalance: Double,
+    schoolProfile: SchoolProfile
+) {
+    try {
+        val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+        if (printManager == null) {
+            Toast.makeText(context, "Layanan cetak dokumen tidak tersedia di perangkat ini", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+            maximumFractionDigits = 0
+            minimumFractionDigits = 0
+        }
+
+        val effectiveSchoolName = schoolProfile.schoolName.ifBlank { header.schoolName }
+        val effectiveNpsn = schoolProfile.npsn.ifBlank { header.npsn }
+        val effectiveKepsek = schoolProfile.kepalaSekolahName.ifBlank { header.kepsekName }
+        val effectiveBendahara = schoolProfile.bendaharaName.ifBlank { header.bendaharaName }
+
+        val webView = WebView(context)
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                val printAdapter = webView.createPrintDocumentAdapter("RKAS_${selectedBukuKas.replace(" ", "_")}")
+                val jobName = "Kertas Kerja RKAS - $selectedBukuKas"
+                printManager.print(jobName, printAdapter, PrintAttributes.Builder().build())
+            }
+        }
+
+        val htmlRows = StringBuilder()
+        val nonHeaderItems = items.filter { !it.isHeader }
+        nonHeaderItems.forEachIndexed { index, item ->
+            val volStr = "${item.volume} ${item.satuan}"
+            val tarifStr = currencyFormatter.format(item.tarifHarga)
+            val jumlahStr = currencyFormatter.format(item.jumlah)
+            
+            htmlRows.append("""
+                <tr>
+                    <td style="text-align:center; padding:6px; border:1px solid #ccc;">${index + 1}</td>
+                    <td style="padding:6px; border:1px solid #ccc;">${item.uraian}</td>
+                    <td style="text-align:center; padding:6px; border:1px solid #ccc;">$volStr</td>
+                    <td style="text-align:right; padding:6px; border:1px solid #ccc;">$tarifStr</td>
+                    <td style="text-align:right; padding:6px; border:1px solid #ccc; font-weight:bold; color:#1e40af;">$jumlahStr</td>
+                    <td style="text-align:center; padding:6px; border:1px solid #ccc;">${item.fundSource}</td>
+                </tr>
+            """.trimIndent())
+        }
+
+        val fullHtml = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>Kertas Kerja RKAS - $selectedBukuKas</title>
+                <style>
+                    body { font-family: sans-serif; font-size: 11px; margin: 20px; color: #1e293b; }
+                    h2, h3, p { margin: 2px 0; text-align: center; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 10px; }
+                    th { background-color: #1e40af; color: white; padding: 8px; border: 1px solid #1e3a8a; }
+                    .summary-box { margin-top: 14px; padding: 10px; background: #f1f5f9; border-radius: 6px; border: 1px solid #cbd5e1; }
+                    .summary-row { display: flex; justify-content: space-between; margin: 3px 0; font-size: 11px; }
+                    .signature-table { width: 100%; margin-top: 40px; border: none; }
+                    .signature-table td { border: none; text-align: center; width: 50%; }
+                </style>
+            </head>
+            <body>
+                <h2>${effectiveSchoolName.uppercase()}</h2>
+                <p>NPSN: $effectiveNpsn ${if (schoolProfile.address.isNotBlank()) "• ${schoolProfile.address}" else ""}</p>
+                <hr style="border: 1px solid #333; margin: 8px 0 14px 0;">
+                <h3>KERTAS KERJA RENCANA KEGIATAN & BELANJA (RKAS)</h3>
+                <p>Buku Kas / Sumber Dana: <strong>$selectedBukuKas</strong></p>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:30px;">No</th>
+                            <th>Uraian Belanja / Kegiatan</th>
+                            <th style="width:80px;">Volume</th>
+                            <th style="width:100px;">Tarif Satuan</th>
+                            <th style="width:110px;">Jumlah Belanja</th>
+                            <th style="width:85px;">Buku Kas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        $htmlRows
+                    </tbody>
+                </table>
+
+                <div class="summary-box">
+                    <p style="text-align:left; margin:3px 0;"><strong>Alokasi Anggaran Kas ($selectedBukuKas):</strong> ${currencyFormatter.format(totalRevenue)}</p>
+                    <p style="text-align:left; margin:3px 0;"><strong>Total Rencana Belanja:</strong> ${currencyFormatter.format(totalExpenditure)}</p>
+                    <p style="text-align:left; margin:3px 0; color:${if (remainingBalance >= 0) "#166534" else "#dc2626"};"><strong>Sisa Alokasi Anggaran:</strong> ${currencyFormatter.format(remainingBalance)}</p>
+                </div>
+
+                <table class="signature-table">
+                    <tr>
+                        <td>
+                            Mengetahui,<br>
+                            <strong>Kepala Sekolah</strong><br><br><br><br>
+                            <u><strong>$effectiveKepsek</strong></u><br>
+                            ${if (schoolProfile.kepalaSekolahNip.isNotBlank()) "NIP. ${schoolProfile.kepalaSekolahNip}" else ""}
+                        </td>
+                        <td>
+                            Dibuat oleh,<br>
+                            <strong>Bendahara Sekolah</strong><br><br><br><br>
+                            <u><strong>$effectiveBendahara</strong></u><br>
+                            ${if (schoolProfile.bendaharaNip.isNotBlank()) "NIP. ${schoolProfile.bendaharaNip}" else ""}
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+        """.trimIndent()
+
+        webView.loadDataWithBaseURL(null, fullHtml, "text/html", "UTF-8", null)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Gagal mencetak PDF RKAS: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+    }
 }

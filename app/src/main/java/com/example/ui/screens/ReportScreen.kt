@@ -33,6 +33,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
@@ -42,16 +44,11 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.FundSourceDefaults
@@ -85,6 +83,7 @@ import java.util.Locale
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +110,6 @@ fun ReportScreen(
     var subTab by remember { mutableStateOf(0) }
 
     val selectedFundSource = bkuReportState.selectedFundSource.ifBlank { fundSources.firstOrNull() ?: "BOS Reguler" }
-    var expandedFundDropdown by remember { mutableStateOf(false) }
     var showDeleteAllConfirmDialog by remember { mutableStateOf(false) }
 
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
@@ -145,6 +143,8 @@ fun ReportScreen(
 
             val htmlRows = StringBuilder()
             listWithRunningBalance.forEachIndexed { index, (item, runningBalance) ->
+                val volumeStr = if (item.volume % 1.0 == 0.0) item.volume.toInt().toString() else item.volume.toString()
+                val unitStr = item.unitName.ifBlank { "-" }
                 val dateStr = dateFormatter.format(Date(item.date))
                 val inStr = if (item.type == "PEMASUKAN") currencyFormatter.format(item.amount) else "-"
                 val outStr = if (item.type == "PENGELUARAN") currencyFormatter.format(item.amount) else "-"
@@ -156,6 +156,8 @@ fun ReportScreen(
                         <td style="text-align:center; padding:6px; border:1px solid #ccc;">${index + 1}</td>
                         <td style="text-align:center; padding:6px; border:1px solid #ccc;">$dateStr</td>
                         <td style="padding:6px; border:1px solid #ccc;">${item.title}</td>
+                        <td style="text-align:center; padding:6px; border:1px solid #ccc;">$volumeStr</td>
+                        <td style="text-align:center; padding:6px; border:1px solid #ccc;">$unitStr</td>
                         <td style="text-align:right; padding:6px; border:1px solid #ccc; color:#059669;">$inStr</td>
                         <td style="text-align:right; padding:6px; border:1px solid #ccc; color:#dc2626;">$outStr</td>
                         <td style="text-align:right; padding:6px; border:1px solid #ccc; font-weight:bold;">$balStr</td>
@@ -193,6 +195,8 @@ fun ReportScreen(
                                 <th style="width:30px;">No</th>
                                 <th style="width:70px;">Tanggal</th>
                                 <th>Uraian Transaksi</th>
+                                <th style="width:55px;">Volume</th>
+                                <th style="width:55px;">Satuan</th>
                                 <th style="width:90px;">Pemasukan</th>
                                 <th style="width:90px;">Pengeluaran</th>
                                 <th style="width:95px;">Saldo</th>
@@ -289,6 +293,7 @@ fun ReportScreen(
         if (subTab == 1) {
             RkasScreen(
                 fundSources = fundSources,
+                schoolProfile = schoolProfile,
                 googleSheetsUrl = googleSheetsUrl,
                 spreadsheetDocUrl = spreadsheetDocUrl,
                 onSyncRkasToSheets = onSyncRkasToSheets,
@@ -296,45 +301,12 @@ fun ReportScreen(
                 onSaveGoogleSheetsUrl = onSaveGoogleSheetsUrl
             )
         } else {
-        // Action Row: Buka Sheet, Ekspor CSV, Cetak PDF, & Reset
-        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+        // Action Row: Ekspor CSV, Cetak PDF, & Reset Data
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
-                onClick = {
-                    val target = if (spreadsheetDocUrl.isNotBlank()) {
-                        spreadsheetDocUrl
-                    } else if (googleSheetsUrl.isNotBlank()) {
-                        googleSheetsUrl
-                    } else {
-                        ""
-                    }
-                    if (target.isNotBlank()) {
-                        try {
-                            val url = if (!target.startsWith("http://") && !target.startsWith("https://")) "https://$target" else target
-                            uriHandler.openUri(url)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Gagal membuka tautan Google Sheet", Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        Toast.makeText(context, "Tautan Google Sheet belum diatur. Silakan atur di Pengaturan Akun & Sekolah.", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.TableChart,
-                    contentDescription = "Buka Google Sheets",
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
             Button(
                 onClick = { onExportCsv(context, selectedFundSource) },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
@@ -347,6 +319,8 @@ fun ReportScreen(
                     contentDescription = "Ekspor CSV",
                     modifier = Modifier.size(18.dp)
                 )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Ekspor CSV", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
 
             Button(
@@ -361,6 +335,8 @@ fun ReportScreen(
                     contentDescription = "Cetak PDF",
                     modifier = Modifier.size(18.dp)
                 )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Cetak PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
 
             Button(
@@ -368,45 +344,93 @@ fun ReportScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                modifier = Modifier.weight(1.3f)
+                modifier = Modifier.weight(0.9f)
             ) {
-                Text("Reset", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Reset", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Filters Bar (Sumber Dana)
-        Row(
+        // Filters Bar (Sumber Dana - Sama seperti di Kertas Kerja)
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            ExposedDropdownMenuBox(
-                expanded = expandedFundDropdown,
-                onExpandedChange = { expandedFundDropdown = !expandedFundDropdown },
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp)
             ) {
-                OutlinedTextField(
-                    value = selectedFundSource,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Filter Sumber Dana", fontSize = 11.sp) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFundDropdown) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                ExposedDropdownMenu(
-                    expanded = expandedFundDropdown,
-                    onDismissRequest = { expandedFundDropdown = false }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    fundSources.forEach { fund ->
-                        DropdownMenuItem(
-                            text = { Text(fund, fontSize = 11.sp) },
-                            onClick = {
-                                onSelectFundSource(fund)
-                                expandedFundDropdown = false
-                            }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalanceWallet,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "PILIH SUMBER DANA",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Text(
+                        text = selectedFundSource,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Chips Pilihan Sumber Dana
+                val allSources = if (fundSources.isNotEmpty()) fundSources else FundSourceDefaults.SOURCES
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(allSources) { fund ->
+                        val isSelected = selectedFundSource.equals(fund, ignoreCase = true)
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onSelectFundSource(fund) },
+                            label = {
+                                Text(
+                                    text = fund,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            leadingIcon = if (isSelected) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            } else null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = Color.White,
+                                selectedLeadingIconColor = Color.White,
+                                containerColor = Color(0xFFF1F5F9),
+                                labelColor = Color(0xFF334155)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         )
                     }
                 }
@@ -467,7 +491,7 @@ fun ReportScreen(
                 .background(Color.White, RoundedCornerShape(12.dp))
                 .horizontalScroll(scrollState)
         ) {
-            Column(modifier = Modifier.width(920.dp)) {
+            Column(modifier = Modifier.width(1060.dp)) {
                 // Table Header
                 Row(
                     modifier = Modifier
@@ -478,7 +502,9 @@ fun ReportScreen(
                 ) {
                     Text("No", modifier = Modifier.width(36.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
                     Text("Tanggal", modifier = Modifier.width(90.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
-                    Text("Uraian Transaksi", modifier = Modifier.width(260.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                    Text("Uraian Transaksi", modifier = Modifier.width(240.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                    Text("Volume", modifier = Modifier.width(70.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center))
+                    Text("Satuan", modifier = Modifier.width(70.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center))
                     Text("Pemasukan", modifier = Modifier.width(120.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
                     Text("Pengeluaran", modifier = Modifier.width(120.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
                     Text("Saldo", modifier = Modifier.width(120.dp), style = MaterialTheme.typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
@@ -497,6 +523,9 @@ fun ReportScreen(
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         itemsIndexed(listWithRunningBalance) { index, (item, runningBalance) ->
+                            val volumeDisplay = if (item.volume % 1.0 == 0.0) item.volume.toInt().toString() else item.volume.toString()
+                            val unitDisplay = item.unitName.ifBlank { "-" }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -506,7 +535,9 @@ fun ReportScreen(
                             ) {
                                 Text("${index + 1}", modifier = Modifier.width(36.dp), style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF1E293B)))
                                 Text(dateFormatter.format(Date(item.date)), modifier = Modifier.width(90.dp), style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF334155)))
-                                Text(item.title, modifier = Modifier.width(260.dp), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A)))
+                                Text(item.title, modifier = Modifier.width(240.dp), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A)))
+                                Text(volumeDisplay, modifier = Modifier.width(70.dp), style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF334155), textAlign = TextAlign.Center))
+                                Text(unitDisplay, modifier = Modifier.width(70.dp), style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF334155), textAlign = TextAlign.Center))
                                 Text(
                                     if (item.type == "PEMASUKAN") currencyFormatter.format(item.amount) else "-",
                                     modifier = Modifier.width(120.dp),

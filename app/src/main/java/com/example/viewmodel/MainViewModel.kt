@@ -413,9 +413,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .apply()
 
         viewModelScope.launch {
-            _eventFlow.emit(UiEvent.ShowToast("Pairing QR Berhasil! Terhubung ke $cleanName ($cleanNpsn)"))
-            // Auto fetch immediately from cloud mailbox
-            fetchFromCloudMailbox(silent = false)
+            _eventFlow.emit(UiEvent.ShowToast("Pairing Berhasil! Memulai sinkronisasi otomatis Kepala Sekolah & Bendahara..."))
+            // Force immediate full bidirectional sync (tarik data terbaru + kirim data lokal)
+            syncCloudMailbox(silent = false)
         }
     }
 

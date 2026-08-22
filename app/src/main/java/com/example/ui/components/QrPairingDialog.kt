@@ -146,6 +146,9 @@ fun QrPairingDialog(
         }
     }
 
+    // Camera scanner state
+    var isCameraScanning by remember { mutableStateOf(false) }
+
     // Scanner / Manual input state
     var manualInputCode by remember { mutableStateOf("") }
     var scannedSuccessData by remember { mutableStateOf<SchoolQrPairingData?>(null) }
@@ -400,29 +403,42 @@ fun QrPairingDialog(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                Button(
-                                    onClick = {
-                                        if (!hasCameraPermission) {
-                                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                        } else {
-                                            // Simulated camera frame reader or direct clipboard auto-detect
-                                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                            val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-                                            if (clipText.contains("SIMPAS_BKU") || clipText.startsWith("BKU-")) {
-                                                processPairingJson(clipText)
-                                                Toast.makeText(context, "QR Code terdeteksi dari pairing!", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "Kamera aktif. Anda juga bisa menempelkan kode pairing di bawah jika kamera terhalang.", Toast.LENGTH_LONG).show()
-                                            }
+                                if (isCameraScanning && hasCameraPermission) {
+                                    CameraQrScannerView(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(260.dp),
+                                        onQrDetected = { detectedCode ->
+                                            processPairingJson(detectedCode)
                                         }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(if (hasCameraPermission) "📸 Buka Pemindai Kamera" else "Minta Izin Kamera & Scan", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    OutlinedButton(
+                                        onClick = { isCameraScanning = false },
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Tutup Kamera", fontSize = 11.sp)
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            if (!hasCameraPermission) {
+                                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                            } else {
+                                                isCameraScanning = true
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(if (hasCameraPermission) "Buka Kamera Scanner" else "Minta Izin Kamera & Buka Scanner", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.height(16.dp))

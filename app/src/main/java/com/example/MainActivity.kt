@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -246,6 +245,7 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                     onNavigateToEntry = { activeTab = 1 },
                     onNavigateToApproval = { activeTab = 2 },
                     onViewReceipt = { tx -> selectedReceiptTx = tx },
+                    onEditTransaction = { tx -> viewModel.updateTransaction(tx) },
                     onDeleteTransaction = { tx -> viewModel.deleteTransaction(tx) }
                 )
 
