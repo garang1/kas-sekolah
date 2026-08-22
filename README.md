@@ -1,4 +1,4 @@
-# 📚 Buku Kas Pintar (BKU Sekolah Digital)
+# 📚 Buku Kas Pintar (Kas Simapas)
 
 **Aplikasi Pengelolaan Buku Kas Utama (BKU) & Keuangan Sekolah Terintegrasi untuk SD/SMP/SMA**
 
