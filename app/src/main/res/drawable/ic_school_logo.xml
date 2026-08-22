@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Top Wing Blade (Primary High Feather Sweeping Up-Right) -->
+    <path
+        android:fillColor="#C02633"
+        android:pathData="M88,10 C80,20 62,32 40,42 C30,47 24,51 22,55 C20,58 20,60 25,58 C35,53 52,44 68,30 C76,23 83,16 88,10 Z" />
+
+    <path
+        android:fillColor="#E11D48"
+        android:pathData="M88,10 C75,25 55,38 38,46 C52,38 72,24 88,10 Z" />
+
+    <!-- Upper Secondary Feather -->
+    <path
+        android:fillColor="#B91C1C"
+        android:pathData="M88,32 C78,38 60,46 45,51 C32,55 24,60 22,62 C26,62 38,58 52,51 C68,42 80,36 88,32 Z" />
+
+    <!-- Lower Secondary Feather -->
+    <path
+        android:fillColor="#991B1B"
+        android:pathData="M84,50 C74,54 58,60 48,64 C38,68 28,72 25,72 C30,71 44,66 58,60 C70,55 79,52 84,50 Z" />
+
+    <!-- Main Eagle Head & Body Silhouette (Rich Red / Maroon) -->
+    <path
+        android:fillColor="#7F1D1D"
+        android:pathData="M22,54 C18,52 16,56 18,60 C20,63 23,65 25,60 C26,58 28,55 33,52 C38,50 48,48 58,52 C65,55 68,64 62,76 C58,82 56,88 58,88 C60,88 64,80 68,72 C72,64 70,54 62,48 C52,42 38,42 28,46 C24,48 22,51 22,54 Z" />
+
+    <!-- Beak (Hooked Dark Maroon/Brown) -->
+    <path
+        android:fillColor="#450A0A"
+        android:pathData="M22,55 C18,55 16,58 18,63 C20,67 22,66 23,62 C23,60 24,57 26,56 Z" />
+
+    <!-- Eagle Eye Cutout (White / Bright) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,48 C30,47 33,48 31,50 C29,51 27,50 28,48 Z" />
+
+    <!-- Pupil Spot -->
+    <path
+        android:fillColor="#450A0A"
+        android:pathData="M29,48.5 C29.5,48.5 30,49 29.5,49.5 C29,49.5 28.5,49 29,48.5 Z" />
+
+    <!-- Text Header Accent at Bottom ("SISTEM KEUANGAN SEKOLAH" Indigo Navy) -->
+    <!-- "SISTEM" Line -->
+    <path
+        android:fillColor="#3730A3"
+        android:pathData="M38,92 H70 V94 H38 Z" />
+
+    <!-- "KEUANGAN SEKOLAH" Bold Line -->
+    <path
+        android:fillColor="#312E81"
+        android:pathData="M28,97 H80 V100 H28 Z" />
+
+</vector>
