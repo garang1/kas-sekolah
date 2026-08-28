@@ -43,7 +43,7 @@ data class OnlineCheckResult(
     val message: String,
     val schoolName: String = "",
     val deviceSlot: String = "",
-    val maxDevices: Int = 2
+    val maxDevices: Int = 5
 )
 
 object LicenseManager {
@@ -217,7 +217,7 @@ object LicenseManager {
                     val trialExpiryStr = json.optString("trialExpiryDate", "").trim()
                     val registeredName = json.optString("schoolName", "")
                     val deviceSlot = json.optString("deviceSlot", "")
-                    val maxDevices = json.optInt("maxDevices", 2)
+                    val maxDevices = json.optInt("maxDevices", 5)
                     val message = json.optString("message", "")
 
                     val prefs = getPrefs(context)
@@ -397,7 +397,7 @@ object LicenseManager {
         // 1. Jika Diblokir atau Melebihi Kuota (Overlimit)
         if (isBlocked) {
             val blockReason = if (deviceSlot == "OVERLIMIT") {
-                "⛔ Kuota Perangkat Penuh (Maksimal 2 HP/Sekolah)"
+                "⛔ Kuota Perangkat Penuh (Maksimal 5 HP/Sekolah)"
             } else {
                 "⛔ Lisensi Dinonaktifkan / Diblokir oleh Pusat"
             }

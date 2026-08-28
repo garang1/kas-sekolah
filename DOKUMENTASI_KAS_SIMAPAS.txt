@@ -1,0 +1,42 @@
+# 📱 Dokumentasi Aplikasi: Kas Simapas (Buku Kas Pintar)
+
+**Kas Simapas** adalah aplikasi mobile berbasis Android yang dirancang khusus untuk mendigitalkan dan menyederhanakan tata kelola administrasi keuangan (Buku Kas Utama/BKU) di lingkungan instansi pendidikan (SD, SMP, SMA, maupun instansi swasta). 
+
+Aplikasi ini bertindak sebagai asisten pintar bagi **Bendahara** sekaligus panel pemantauan (*monitoring*) transparan bagi **Kepala Sekolah**, memastikan pengelolaan dana BOS, BOP, Komite, dan kas lainnya tercatat secara rapi, aman, dan dapat dipertanggungjawabkan (akuntabel).
+
+---
+
+## 🌟 MANFAAT UTAMA MENGGUNAKAN KAS SIMAPAS
+
+1. **Bebas Kertas & Bukti Nota yang Hilang (Paperless & Secure)**
+   Seringkali nota fisik pudar atau hilang sebelum masa audit (SPJ) tiba. Dengan Kas Simapas, Bendahara dapat langsung memotret nota/kuitansi dari HP saat transaksi terjadi. Bukti digital akan menempel selamanya pada rincian transaksi tersebut.
+2. **Transparansi Tanpa Jarak (Real-Time Sync)**
+   Kepala Sekolah tidak perlu lagi menanyakan buku kas fisik kepada Bendahara. Berbekal fitur *Pairing Cloud*, Kepala Sekolah dapat melihat secara *live* setiap transaksi yang baru saja dientri oleh Bendahara dari HP-nya masing-masing.
+3. **Mencegah Defisit & Kesalahan Anggaran**
+   Sistem memiliki peringatan cerdas ("Saldo Tidak Cukup"). Bendahara tidak bisa mencatat pengeluaran jika saldo pada Pos Dana terkait (misal: BOS Reguler) sudah habis. Ini mencegah pembengkakan anggaran atau salah catat antar sumber dana.
+4. **Fleksibilitas (Offline & Online)**
+   Aplikasi dirancang dengan pendekatan *Offline-First*. Bendahara tetap bisa mencatat transaksi meski sedang berada di pelosok yang tidak ada sinyal internet. Begitu sinyal didapatkan, data akan disinkronkan ke *cloud* secara otomatis di latar belakang.
+5. **Aman & Berlapis (Multi-Level Security)**
+   Dilengkapi dengan PIN pengaman aplikasi (seperti aplikasi M-Banking) untuk mencegah orang lain membuka data keuangan sekolah.
+
+---
+
+## ⚙️ FUNGSI & FITUR UNGGULAN
+
+### 1. 👥 Multi-Akses: Bendahara & Kepala Sekolah
+Aplikasi memiliki pemisahan peran yang tegas. 
+*   **Bendahara:** Memiliki hak penuh untuk mencatat transaksi masuk/keluar, memotret nota, dan mengunduh format laporan.
+*   **Kepala Sekolah:** Bertindak sebagai *supervisor*. Memiliki menu khusus "Persetujuan (Approval)" untuk mem-verifikasi dan menyetujui transaksi besar, serta memantau kesehatan kas secara keseluruhan.
+
+### 2. 🔗 Pairing Cepat Antar HP (Maks. 5 Perangkat)
+Fitur inovatif ini memungkinkan perangkat Bendahara dan Kepala Sekolah saling terhubung tanpa perlu mendaftar akun email. Cukup **Scan QR Code** dari satu HP ke HP lainnya. Untuk menjaga keamanan server sekolah, satu kode lisensi sekolah (NPSN) dibatasi maksimal menampung 5 perangkat.
+
+### 3. 🗄️ Sinkronisasi Data Rahasia & Migrasi Cerdas
+*   **Backup / Restore:** Pengguna bisa mencadangkan data kas mereka ke dalam file lokal (JSON/CSV) untuk diekspor ke Komputer (Excel) guna pelaporan fisik (SPJ).
+*   Jika Bendahara berganti HP baru, mereka cukup menekan tombol *Restore*, dan sistem migrasi cerdas akan memulihkan data persis seperti sedia kala tanpa takut datanya rusak (corrupt) atau bocor ke sekolah lain.
+
+### 4. 💼 Pos Dana Dinamis (Multipel Kas)
+Tidak seperti aplikasi kasir biasa yang mencampur semua uang dalam satu laci. Di Kas Simapas, uang dikelompokkan ke dalam "Kotak/Pos Dana" terpisah (misal: *BOS Reguler, Dana Komite, BOS Kinerja, Hibah*). Jika saldo BOS kosong, pengeluaran BOS akan ditolak, meskipun saldo di Dana Komite masih banyak.
+
+### 5. 📝 Laporan Ekspor CSV Otomatis (Format Resmi)
+Dengan satu sentuhan, aplikasi dapat mengekspor riwayat transaksi per bulan/tahap ke dalam bentuk CSV (bisa dibuka di Microsoft Excel). Format yang dihasilkan sudah menyesuaikan gaya Buku Kas Umum (BKU) standar lengkap dengan blok tanda tangan Kepala Sekolah (dengan NIP) dan Bendahara di bagian bawah laporan.

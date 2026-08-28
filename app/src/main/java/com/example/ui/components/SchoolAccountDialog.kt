@@ -27,6 +27,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
@@ -97,10 +99,24 @@ fun SchoolAccountDialog(
     onUpdateFundSources: (List<FundSourceModel>) -> Unit = {},
     onRenameFundSource: (oldName: String, newName: String) -> Unit = { _, _ -> },
     onSyncAllToGoogleSheets: () -> Unit = {},
-    onFetchFromGoogleSheets: () -> Unit = {}
+    onFetchFromGoogleSheets: () -> Unit = {},
+    onBackupData: (android.net.Uri) -> Unit = {},
+    onRestoreData: (android.net.Uri) -> Unit = {}
 ) {
     val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) } // 0: Login, 1: Profil, 2: Pos Dana, 3: Kotak Surat Cloud, 4: Google Sheets, 5: Info
+
+    val backupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { onBackupData(it) }
+    }
+
+    val restoreLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { onRestoreData(it) }
+    }
 
     // Login Form State
     var selectedRoleToLogin by remember { mutableStateOf(userSession.role) }
@@ -253,6 +269,51 @@ fun SchoolAccountDialog(
                                     enabled = newPinInput.length == 6
                                 ) {
                                     Text("Simpan PIN Baru", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Backup & Restore Section
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text("Pencadangan Data", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { backupLauncher.launch("bku_backup_${System.currentTimeMillis()}.json") },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        Icon(imageVector = androidx.compose.material.icons.Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Backup", fontSize = 11.sp)
+                                    }
+                                    Button(
+                                        onClick = { restoreLauncher.launch(arrayOf("application/json", "*/*")) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.secondary
+                                        )
+                                    ) {
+                                        Icon(imageVector = androidx.compose.material.icons.Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Restore", fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }

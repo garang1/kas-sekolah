@@ -1,5 +1,8 @@
 package com.example.data.model
 
+import com.squareup.moshi.JsonClass
+
+@JsonClass(generateAdapter = true)
 data class SchoolProfile(
     val schoolName: String = "SD Negeri 33/III Air Tenang",
     val npsn: String = "10103214",

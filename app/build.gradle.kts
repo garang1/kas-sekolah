@@ -14,8 +14,8 @@ android {
     applicationId = "com.aistudio.bukukaspintar.sdn33.stxmob"
     minSdk = 24
     targetSdk = 36
-    versionCode = 53
-    versionName = "5.3"
+    versionCode = 59
+    versionName = "5.9"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

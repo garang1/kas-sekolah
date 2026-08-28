@@ -6,7 +6,6 @@
 ![Kotlin](https://img.shields.io/badge/Language-Kotlin-purple.svg)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-blue.svg)
 ![Room Database](https://img.shields.io/badge/Database-Room%20SQLite-orange.svg)
-![Gemini AI](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-brightgreen.svg)
 
 ---
 
@@ -14,7 +13,7 @@
 
 **Buku Kas Pintar** adalah aplikasi Android berbasis **Jetpack Compose** dan **Room Database** yang dirancang khusus untuk mempermudah Bendahara dan Kepala Sekolah dalam mencatat, mengelola, menyetujui, dan mengarsipkan transaksi keuangan sekolah (BOS Reguler, BOS Kinerja, Dana Komite, BOP, SiPA).
 
-Aplikasi ini dilengkapi dengan fitur cerdas **AI Voice Input (Google Gemini NLP)** yang dapat mengonversi perintah suara menjadi entri transaksi keuangan secara otomatis, serta **Sinkronisasi Real-Time Google Sheets (Apps Script)** yang memungkinkan akuntabilitas transparan antara HP Bendahara dan HP Kepala Sekolah.
+Aplikasi ini dilengkapi dengan **Sinkronisasi Real-Time Google Sheets (Apps Script)** yang memungkinkan akuntabilitas transparan antara HP Bendahara dan HP Kepala Sekolah.
 
 ---
 
@@ -25,25 +24,21 @@ Aplikasi ini dilengkapi dengan fitur cerdas **AI Voice Input (Google Gemini NLP)
 * **Kepala Sekolah**: Otoritas verifikasi & approval transaksi pengeluaran (khusus pengeluaran ≥ Rp 50.000 atau sesuai ketentuan).
 * **Proteksi PIN Akses**: Sistem keamanan akun dengan PIN login yang dapat disesuaikan.
 
-### 2. 🎙️ AI Voice Input (Suara ke Transaksi)
-* Cukup sebutkan perintah suara, contoh: `"Beli kertas HVS 2 rim sebesar seratus sepuluh ribu rupiah menggunakan dana BOS"`
-* Sistem **Gemini AI** secara cerdas mengekstrak judul, nominal, jenis kas, sumber dana, dan kategori belanja secara otomatis.
-
-### 3. ☁️ Sinkronisasi Multi-HP via Google Sheets
+### 2. ☁️ Sinkronisasi Multi-HP via Google Sheets
 * **Database Cloud Gratis**: Menggunakan **Google Apps Script Web App** yang terhubung langsung ke Google Spreadsheet milik sekolah.
 * **Kolaborasi Real-Time**: Bendahara mencatat dari HP-nya, lalu tekan **Sinkron ke Sheets**. Kepala Sekolah dapat menekan **Tarik Data** dari HP-nya untuk melihat dan memberikan persetujuan (approval) secara instan.
 * **Pengisian & Revisi Langsung di Spreadsheet**: Fleksibilitas mengisi atau mengedit baris data transaksi dalam jumlah banyak langsung di Google Sheets komputer, kemudian ditarik (*pull*) kembali ke aplikasi.
 
-### 4. 📷 Bukti Digital Nota & Kuitansi (Opsional)
+### 3. 📷 Bukti Digital Nota & Kuitansi (Opsional)
 * Pengambilan foto nota/kuitansi belanja menggunakan kamera atau galeri.
 * Bersifat **opsional** (tidak menghambat proses pencatatan kas awal).
 * Modul **Viewer Nota** interaktif untuk peninjauan SPJ.
 
-### 5. 📊 Laporan BKU & Rekap SPJ Otomatis
+### 4. 📊 Laporan BKU & Rekap SPJ Otomatis
 * Rekapitulasi per Sumber Dana (BOS, Komite, dll) dan per Tahap/Gelombang (Tahap 1 Jan-Jun, Tahap 2 Jul-Des).
 * Format Laporan BKU Resmi dengan blok penandatanganan **Kepala Sekolah** & **Bendahara** beserta NIP resmi.
 
-### 6. 🏫 Profil Identitas Sekolah Dinamis
+### 5. 🏫 Profil Identitas Sekolah Dinamis
 * Pengaturan nama sekolah, NPSN, alamat, nama & NIP Kepala Sekolah, serta Bendahara yang dapat disesuaikan untuk sekolah manapun.
 
 ---
@@ -55,7 +50,6 @@ Aplikasi ini dilengkapi dengan fitur cerdas **AI Voice Input (Google Gemini NLP)
 * **Arsitektur**: MVVM (Model-View-ViewModel) + Clean Architecture pattern
 * **Database Lokal**: Android Room Database (Offline First Approach)
 * **Asynchronous**: Kotlin Coroutines & `StateFlow` / `SharedFlow`
-* **Integrasi AI**: Google Gemini API (Gemini 2.5 Flash) via Ktor / REST Engine
 * **Cloud Sync**: Google Apps Script Web App (JSON Endpoint) & Google Sheets
 
 ---
@@ -64,7 +58,7 @@ Aplikasi ini dilengkapi dengan fitur cerdas **AI Voice Input (Google Gemini NLP)
 
 ### Persyaratan Sistem
 * Perangkat Android dengan OS **Android 8.0 (API Level 26)** atau versi yang lebih baru.
-* Koneksi internet (untuk fitur AI Voice dan Sinkronisasi Google Sheets).
+* Koneksi internet (untuk fitur Sinkronisasi Google Sheets).
 
 ### Cara Menghubungkan Google Sheets (Multi-HP)
 1. Buka Google Sheets baru di akun Google/Gmail Sekolah.
@@ -85,8 +79,6 @@ Aplikasi ini dilengkapi dengan fitur cerdas **AI Voice Input (Google Gemini NLP)
 │   ├── database/            # Database Room (AppDatabase)
 │   ├── model/               # Data model (TransactionEntity, SchoolProfile, UserRole)
 │   └── repository/          # Repository & Google Sheets Sync Logic
-├── services/
-│   └── GeminiNlpService.kt  # AI Voice Parsing Engine (Gemini API)
 ├── ui/
 │   ├── components/          # Komponen UI Reusable (Banner, Modals, Dialogs)
 │   ├── screens/             # Skrin Aplikasi (Dashboard, Entry, Approval, Report)

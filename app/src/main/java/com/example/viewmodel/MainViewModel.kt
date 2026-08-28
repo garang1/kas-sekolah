@@ -393,6 +393,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val cleanName = schoolName.trim()
         val cleanKey = newKey.trim()
 
+        val oldNpsn = schoolProfile.value.npsn
+        val isNpsnChanged = oldNpsn.isNotBlank() && cleanNpsn.isNotBlank() && oldNpsn != cleanNpsn
+
         if (cleanKey.isNotBlank()) {
             schoolPairingKey.value = cleanKey
         }
@@ -413,7 +416,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .apply()
 
         viewModelScope.launch {
-            _eventFlow.emit(UiEvent.ShowToast("Pairing Berhasil! Memulai sinkronisasi otomatis Kepala Sekolah & Bendahara..."))
+            if (isNpsnChanged) {
+                _eventFlow.emit(UiEvent.ShowToast("NPSN berubah. Membersihkan data lama untuk menghindari kebocoran data sekolah..."))
+                repository.deleteAllTransactions()
+            } else {
+                _eventFlow.emit(UiEvent.ShowToast("Pairing Berhasil! Memulai sinkronisasi otomatis Kepala Sekolah & Bendahara..."))
+            }
             // Force immediate full bidirectional sync (tarik data terbaru + kirim data lokal)
             syncCloudMailbox(silent = false)
         }
@@ -421,7 +429,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun sendToCloudMailbox(silent: Boolean = false) {
         viewModelScope.launch {
-            val npsn = schoolProfile.value.npsn.ifBlank { "10103214" }
+            val npsn = schoolProfile.value.npsn.trim()
+            if (npsn.isBlank()) {
+                if (!silent) _eventFlow.emit(UiEvent.ShowToast("NPSN belum diisi. Sinkronisasi antar HP dinonaktifkan."))
+                return@launch
+            }
             val pairingKey = schoolPairingKey.value.ifBlank { "BKU-$npsn" }
             val role = currentRole.value
             val name = if (role == UserRole.BENDAHARA) schoolProfile.value.bendaharaName else schoolProfile.value.kepalaSekolahName
@@ -455,7 +467,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun fetchFromCloudMailbox(silent: Boolean = false) {
         viewModelScope.launch {
-            val npsn = schoolProfile.value.npsn.ifBlank { "10103214" }
+            val npsn = schoolProfile.value.npsn.trim()
+            if (npsn.isBlank()) {
+                if (!silent) _eventFlow.emit(UiEvent.ShowToast("NPSN belum diisi. Sinkronisasi antar HP dinonaktifkan."))
+                return@launch
+            }
             val pairingKey = schoolPairingKey.value.ifBlank { "BKU-$npsn" }
             val role = currentRole.value
 
@@ -494,7 +510,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun syncCloudMailbox(silent: Boolean = false) {
         viewModelScope.launch {
-            val npsn = schoolProfile.value.npsn.ifBlank { "10103214" }
+            val npsn = schoolProfile.value.npsn.trim()
+            if (npsn.isBlank()) {
+                if (!silent) _eventFlow.emit(UiEvent.ShowToast("NPSN belum diisi. Sinkronisasi antar HP dinonaktifkan."))
+                return@launch
+            }
             val pairingKey = schoolPairingKey.value.ifBlank { "BKU-$npsn" }
             val role = currentRole.value
             val name = if (role == UserRole.BENDAHARA) schoolProfile.value.bendaharaName else schoolProfile.value.kepalaSekolahName
@@ -970,6 +990,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.deleteAllTransactions()
             _eventFlow.emit(UiEvent.ShowToast("Semua data transaksi & saldo berhasil dibersihkan (Rp 0)!"))
             triggerAutoSyncIfConfigured()
+        }
+    }
+
+    fun backupData(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            _eventFlow.emit(UiEvent.ShowToast("Memulai pencadangan data..."))
+            val backupData = com.example.data.model.AppBackupData(
+                timestamp = System.currentTimeMillis(),
+                schoolProfile = schoolProfile.value,
+                transactions = allTransactions.value
+            )
+            val success = BackupRestoreHelper.backupDataToUri(context, uri, backupData)
+            if (success) {
+                _eventFlow.emit(UiEvent.ShowToast("Pencadangan Berhasil Disimpan!"))
+            } else {
+                _eventFlow.emit(UiEvent.ShowToast("Gagal melakukan pencadangan data."))
+            }
+        }
+    }
+
+    fun restoreData(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            _eventFlow.emit(UiEvent.ShowToast("Membaca file cadangan..."))
+            val backupData = BackupRestoreHelper.restoreDataFromUri(context, uri)
+            if (backupData != null) {
+                // Update profile
+                updateSchoolProfile(backupData.schoolProfile)
+                
+                // Clear existing transactions and insert new ones
+                repository.deleteAllTransactions()
+                backupData.transactions.forEach { t ->
+                    // Reset ID to avoid constraint failures, or keep existing IDs to preserve order
+                    val newT = t.copy(id = 0)
+                    repository.insertTransaction(newT)
+                }
+                
+                _eventFlow.emit(UiEvent.ShowToast("Restorasi Berhasil! Data telah dipulihkan."))
+                triggerAutoSyncIfConfigured()
+            } else {
+                _eventFlow.emit(UiEvent.ShowToast("Gagal memulihkan data. File tidak valid atau rusak."))
+            }
         }
     }
 

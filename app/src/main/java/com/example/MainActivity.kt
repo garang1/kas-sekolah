@@ -317,7 +317,9 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                 onUpdateFundSources = { list -> viewModel.updateFundSources(list) },
                 onRenameFundSource = { old, new -> viewModel.renameFundSource(old, new) },
                 onSyncAllToGoogleSheets = { viewModel.syncAllToGoogleSheets() },
-                onFetchFromGoogleSheets = { viewModel.fetchFromGoogleSheets() }
+                onFetchFromGoogleSheets = { viewModel.fetchFromGoogleSheets() },
+                onBackupData = { uri -> viewModel.backupData(context, uri) },
+                onRestoreData = { uri -> viewModel.restoreData(context, uri) }
             )
         }
 
