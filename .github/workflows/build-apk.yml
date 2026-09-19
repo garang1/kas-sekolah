@@ -1,12 +1,9 @@
-name: Build and Release Android APK
+name: Build Android APK
 
 on:
   push:
     branches: [ "main", "master" ]
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   build:
@@ -33,17 +30,8 @@ jobs:
         mkdir -p release_apk
         cp app/build/outputs/apk/debug/app-debug.apk release_apk/Kas-Simapas-v5.9.apk
 
-    - name: Publish to GitHub Releases
-      uses: softprops/action-gh-release@v2
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
       with:
-        tag_name: v5.9
-        name: "Kas Simapas v5.9 (APK Siap Pasang)"
-        body: |
-          Aplikasi Buku Kas Pintar (Kas Simapas) untuk Android.
-          
-          ### Cara Instal:
-          1. Unduh file **Kas-Simapas-v5.9.apk** di bawah ini.
-          2. Buka file di HP Android dan pasang (izinkan instalasi dari sumber tidak dikenal jika diminta).
-        files: release_apk/Kas-Simapas-v5.9.apk
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Kas-Simapas-v5.9-APK
+        path: release_apk/Kas-Simapas-v5.9.apk
