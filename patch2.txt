@@ -1,0 +1,26 @@
+--- app/src/main/java/com/example/viewmodel/MainViewModel.kt
++++ app/src/main/java/com/example/viewmodel/MainViewModel.kt
+@@ -581,8 +581,9 @@
+     private fun triggerAutoSyncIfConfigured() {
+-        // 1. Kotak Surat Cloud (Cara B: Offline-First Cloud Mailbox)
+-        viewModelScope.launch {
+-            try {
+-                sendToCloudMailbox(silent = true)
+-            } catch (ignored: Exception) {}
+-        }
++        val url = googleSheetsUrl.value.trim()
++        val useGoogleSheets = url.isNotBlank() && !url.contains("docs.google.com/spreadsheets")
++
++        if (!useGoogleSheets) {
++            viewModelScope.launch {
++                try {
++                    sendToCloudMailbox(silent = true)
++                } catch (ignored: Exception) {}
++            }
++        }
+ 
+-        // 2. Google Sheets sync (jika URL dikonfigurasi)
+-        val url = googleSheetsUrl.value.trim()
+-        if (url.isNotBlank() && !url.contains("docs.google.com/spreadsheets")) {
++        if (useGoogleSheets) {
+             viewModelScope.launch {

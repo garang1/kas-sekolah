@@ -13,7 +13,7 @@
 
 **Buku Kas Pintar** adalah aplikasi Android berbasis **Jetpack Compose** dan **Room Database** yang dirancang khusus untuk mempermudah Bendahara dan Kepala Sekolah dalam mencatat, mengelola, menyetujui, dan mengarsipkan transaksi keuangan sekolah (BOS Reguler, BOS Kinerja, Dana Komite, BOP, SiPA).
 
-Aplikasi ini dilengkapi dengan **Sinkronisasi Real-Time Google Sheets (Apps Script)** yang memungkinkan akuntabilitas transparan antara HP Bendahara dan HP Kepala Sekolah.
+Aplikasi ini dilengkapi dengan fitur **Pairing Antar HP (Cloud Mailbox)** yang memungkinkan akuntabilitas transparan antara HP Bendahara dan HP Kepala Sekolah secara real-time tanpa perlu akun terpusat.
 
 ---
 
@@ -24,10 +24,10 @@ Aplikasi ini dilengkapi dengan **Sinkronisasi Real-Time Google Sheets (Apps Scri
 * **Kepala Sekolah**: Otoritas verifikasi & approval transaksi pengeluaran (khusus pengeluaran ≥ Rp 50.000 atau sesuai ketentuan).
 * **Proteksi PIN Akses**: Sistem keamanan akun dengan PIN login yang dapat disesuaikan.
 
-### 2. ☁️ Sinkronisasi Multi-HP via Google Sheets
-* **Database Cloud Gratis**: Menggunakan **Google Apps Script Web App** yang terhubung langsung ke Google Spreadsheet milik sekolah.
-* **Kolaborasi Real-Time**: Bendahara mencatat dari HP-nya, lalu tekan **Sinkron ke Sheets**. Kepala Sekolah dapat menekan **Tarik Data** dari HP-nya untuk melihat dan memberikan persetujuan (approval) secara instan.
-* **Pengisian & Revisi Langsung di Spreadsheet**: Fleksibilitas mengisi atau mengedit baris data transaksi dalam jumlah banyak langsung di Google Sheets komputer, kemudian ditarik (*pull*) kembali ke aplikasi.
+### 2. ☁️ Pairing Cerdas Multi-HP (Cloud Mailbox)
+* **Koneksi Cepat via QR Code**: Bendahara dan Kepala Sekolah dapat saling menautkan aplikasi mereka hanya dengan memindai QR Code.
+* **Kolaborasi Real-Time**: Bendahara mencatat dari HP-nya, lalu data secara otomatis tersinkronisasi. Kepala Sekolah dapat melihat dan memberikan persetujuan (approval) secara instan dari HP-nya sendiri.
+* **Keamanan Maksimal (Enkripsi AES-256)**: Data yang disalurkan melalui internet dienkripsi menggunakan kunci rahasia (*Pairing Key*) sehingga tidak bisa diintip oleh pihak luar.
 
 ### 3. 📷 Bukti Digital Nota & Kuitansi (Opsional)
 * Pengambilan foto nota/kuitansi belanja menggunakan kamera atau galeri.
@@ -50,7 +50,7 @@ Aplikasi ini dilengkapi dengan **Sinkronisasi Real-Time Google Sheets (Apps Scri
 * **Arsitektur**: MVVM (Model-View-ViewModel) + Clean Architecture pattern
 * **Database Lokal**: Android Room Database (Offline First Approach)
 * **Asynchronous**: Kotlin Coroutines & `StateFlow` / `SharedFlow`
-* **Cloud Sync**: Google Apps Script Web App (JSON Endpoint) & Google Sheets
+* **Cloud Sync**: Cloud Mailbox Relay (KVDB) dengan Enkripsi AES-256
 
 ---
 
@@ -58,15 +58,7 @@ Aplikasi ini dilengkapi dengan **Sinkronisasi Real-Time Google Sheets (Apps Scri
 
 ### Persyaratan Sistem
 * Perangkat Android dengan OS **Android 8.0 (API Level 26)** atau versi yang lebih baru.
-* Koneksi internet (untuk fitur Sinkronisasi Google Sheets).
-
-### Cara Menghubungkan Google Sheets (Multi-HP)
-1. Buka Google Sheets baru di akun Google/Gmail Sekolah.
-2. Pilih menu **Ekstensi** > **Apps Script**.
-3. Tempelkan skrip penangan Web App (tersedia panduan di tab **Laporan** aplikasi).
-4. Klik **Deploy** > **New Deployment** > Akses: **Anyone** (Siapa Saja).
-5. Salin **URL Web App** dan tempelkan di menu **Pengaturan Database Sheets** pada aplikasi.
-6. Masukkan URL yang SAMA pada HP Bendahara dan HP Kepala Sekolah.
+* Koneksi internet (untuk fitur Sinkronisasi Multi-HP).
 
 ---
 
@@ -78,7 +70,7 @@ Aplikasi ini dilengkapi dengan **Sinkronisasi Real-Time Google Sheets (Apps Scri
 │   ├── dao/                 # Data Access Object Room (TransactionDao)
 │   ├── database/            # Database Room (AppDatabase)
 │   ├── model/               # Data model (TransactionEntity, SchoolProfile, UserRole)
-│   └── repository/          # Repository & Google Sheets Sync Logic
+│   └── repository/          # Repository & Cloud Mailbox Sync Logic
 ├── ui/
 │   ├── components/          # Komponen UI Reusable (Banner, Modals, Dialogs)
 │   ├── screens/             # Skrin Aplikasi (Dashboard, Entry, Approval, Report)

@@ -1,0 +1,10 @@
+--- app/src/main/java/com/example/ui/components/SchoolAccountDialog.kt
++++ app/src/main/java/com/example/ui/components/SchoolAccountDialog.kt
+@@ -677,3 +677,6 @@
+                             appName = "Kas Simapas",
+-                            npsn = schoolProfile.npsn
++                            npsn = schoolProfile.npsn,
++                            googleSheetsUrl = googleSheetsUrl,
++                            spreadsheetDocUrl = spreadsheetDocUrl,
++                            onSaveGoogleSheetsUrl = onSaveGoogleSheetsUrl
+                         )

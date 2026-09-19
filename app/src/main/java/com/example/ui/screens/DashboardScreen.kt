@@ -85,7 +85,8 @@ fun DashboardScreen(
     pendingTransactionsCount: Int,
     onRoleSwitched: (UserRole) -> Unit = {},
     onOpenAccountDialog: () -> Unit = {},
-    onOpenQrPairing: () -> Unit = {},
+    onOpenGoogleSheetsSetup: () -> Unit = {},
+    onSyncNow: () -> Unit = {},
     onLockApp: () -> Unit = {},
     onNavigateToEntry: () -> Unit = {},
     onNavigateToApproval: () -> Unit = {},
@@ -132,7 +133,8 @@ fun DashboardScreen(
                     schoolProfile = schoolProfile,
                     userSession = userSession,
                     onOpenAccountDialog = onOpenAccountDialog,
-                    onOpenQrPairing = onOpenQrPairing,
+                    onOpenGoogleSheetsSetup = onOpenGoogleSheetsSetup,
+                    onSyncNow = onSyncNow,
                     onLockApp = onLockApp
                 )
             }
@@ -168,7 +170,7 @@ fun DashboardScreen(
                                     )
                                 )
                                 Text(
-                                    text = "Pengeluaran ≥ Rp 50.000 membutuhkan persetujuan resmi",
+                                    text = "Pengeluaran kas bendahara membutuhkan persetujuan resmi",
                                     style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFFB45309))
                                 )
                             }

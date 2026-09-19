@@ -73,16 +73,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: TransactionRepository
     private var bkuSyncRepository: GoogleSheetsSyncRepository? = null
-    private val cloudMailboxRepository: com.example.data.repository.CloudMailboxRepository
     private val nlpService = GeminiNlpService()
 
     val currentRole = MutableStateFlow(UserRole.BENDAHARA)
     val schoolProfile = MutableStateFlow(com.example.data.model.SchoolProfile())
     val userSession = MutableStateFlow(com.example.data.model.UserAccountSession())
 
-    val schoolPairingKey = MutableStateFlow("BKU-10103214")
-    val cloudMailboxRelayUrl = MutableStateFlow("")
-    val lastMailboxSyncTime = MutableStateFlow(0L)
 
     val selectedFundFilter = MutableStateFlow("BOS Reguler")
     val selectedCategoryFilter = MutableStateFlow("")
@@ -108,20 +104,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val eventFlow: SharedFlow<UiEvent> = _eventFlow.asSharedFlow()
 
     val syncState: StateFlow<SyncState> get() = bkuSyncRepository?.syncState ?: MutableStateFlow<SyncState>(SyncState.Idle).asStateFlow()
-    val cloudMailboxSyncState: StateFlow<SyncState> get() = cloudMailboxRepository.syncState
 
     init {
         val database = AppDatabase.getDatabase(application, viewModelScope)
         val dao = database.transactionDao()
         repository = TransactionRepository(dao)
-        cloudMailboxRepository = com.example.data.repository.CloudMailboxRepository(repository)
 
         try {
             bkuSyncRepository = GoogleSheetsSyncRepository(dao)
             val prefs = application.getSharedPreferences("bku_settings", Application.MODE_PRIVATE)
             googleSheetsUrl.value = prefs.getString("google_sheets_url", "") ?: ""
             spreadsheetDocUrl.value = prefs.getString("spreadsheet_doc_url", "") ?: ""
-            cloudMailboxRelayUrl.value = prefs.getString("cloud_mailbox_url", "") ?: ""
 
             // Load saved school profile
             val sName = prefs.getString("school_name", "SD Negeri 33/III Air Tenang") ?: "SD Negeri 33/III Air Tenang"
@@ -133,8 +126,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val sBendaharaNip = prefs.getString("school_bendahara_nip", "198507202010012015") ?: "198507202010012015"
 
             // Pairing key per sekolah (default BKU-<NPSN>)
-            val sPairingKey = prefs.getString("school_pairing_key", "BKU-$sNpsn") ?: "BKU-$sNpsn"
-            schoolPairingKey.value = sPairingKey
 
             schoolProfile.value = com.example.data.model.SchoolProfile(
                 schoolName = sName,
@@ -203,20 +194,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Fetch saat aplikasi pertama kali dibuka
                 kotlinx.coroutines.delay(1000)
                 try {
-                    fetchFromCloudMailbox(silent = true)
                 } catch (ignored: Exception) {}
 
                 // Cek data masuk setiap 6 detik secara senyap di latar belakang
                 while (kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.isActive == true) {
                     kotlinx.coroutines.delay(6000)
                     try {
-                        fetchFromCloudMailbox(silent = true)
-                    } catch (ignored: Exception) {}
+                        } catch (ignored: Exception) {}
                 }
             }
         } catch (e: Exception) {
             android.util.Log.e("MainViewModel", "Could not initialize Google Sheets sync repository", e)
         }
+        
     }
 
     fun updateSchoolProfile(profile: com.example.data.model.SchoolProfile) {
@@ -371,216 +361,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setSchoolPairingKey(newKey: String, customRelay: String = "") {
-        val cleanKey = newKey.trim()
-        if (cleanKey.isNotBlank()) {
-            schoolPairingKey.value = cleanKey
-        }
-        cloudMailboxRelayUrl.value = customRelay.trim()
-        val prefs = getApplication<Application>().getSharedPreferences("bku_settings", Application.MODE_PRIVATE)
-        prefs.edit()
-            .putString("school_pairing_key", schoolPairingKey.value)
-            .putString("cloud_mailbox_url", customRelay.trim())
-            .apply()
-
-        viewModelScope.launch {
-            _eventFlow.emit(UiEvent.ShowToast("Kunci Pairing Sekolah '${schoolPairingKey.value}' berhasil disimpan!"))
-        }
-    }
-
-    fun applyQrPairingData(npsn: String, schoolName: String, newKey: String, customRelay: String) {
-        val cleanNpsn = npsn.trim()
-        val cleanName = schoolName.trim()
-        val cleanKey = newKey.trim()
-
-        val oldNpsn = schoolProfile.value.npsn
-        val isNpsnChanged = oldNpsn.isNotBlank() && cleanNpsn.isNotBlank() && oldNpsn != cleanNpsn
-
-        if (cleanKey.isNotBlank()) {
-            schoolPairingKey.value = cleanKey
-        }
-        cloudMailboxRelayUrl.value = customRelay.trim()
-
-        if (cleanNpsn.isNotBlank() || cleanName.isNotBlank()) {
-            val updated = schoolProfile.value.copy(
-                npsn = cleanNpsn.ifBlank { schoolProfile.value.npsn },
-                schoolName = cleanName.ifBlank { schoolProfile.value.schoolName }
-            )
-            updateSchoolProfile(updated)
-        }
-
-        val prefs = getApplication<Application>().getSharedPreferences("bku_settings", Application.MODE_PRIVATE)
-        prefs.edit()
-            .putString("school_pairing_key", schoolPairingKey.value)
-            .putString("cloud_mailbox_url", customRelay.trim())
-            .apply()
-
-        viewModelScope.launch {
-            if (isNpsnChanged) {
-                _eventFlow.emit(UiEvent.ShowToast("NPSN berubah. Membersihkan data lama untuk menghindari kebocoran data sekolah..."))
-                repository.deleteAllTransactions()
-            } else {
-                _eventFlow.emit(UiEvent.ShowToast("Pairing Berhasil! Memulai sinkronisasi otomatis Kepala Sekolah & Bendahara..."))
-            }
-            // Force immediate full bidirectional sync (tarik data terbaru + kirim data lokal)
-            syncCloudMailbox(silent = false)
-        }
-    }
-
-    fun sendToCloudMailbox(silent: Boolean = false) {
-        viewModelScope.launch {
-            val npsn = schoolProfile.value.npsn.trim()
-            if (npsn.isBlank()) {
-                if (!silent) _eventFlow.emit(UiEvent.ShowToast("NPSN belum diisi. Sinkronisasi antar HP dinonaktifkan."))
-                return@launch
-            }
-            val pairingKey = schoolPairingKey.value.ifBlank { "BKU-$npsn" }
-            val role = currentRole.value
-            val name = if (role == UserRole.BENDAHARA) schoolProfile.value.bendaharaName else schoolProfile.value.kepalaSekolahName
-
-            val all = repository.getAllTransactionsSync()
-            val secretSources = customFundSources.value.filter { it.isSecret }.map { it.name }.toSet()
-            val nonSecretTransactions = all.filter { it.fundSource !in secretSources }
-            val nonSecretFundNames = customFundSources.value.filter { !it.isSecret }.map { it.name }
-
-            val result = cloudMailboxRepository.sendPackageToMailbox(
-                npsn = npsn,
-                pairingKey = pairingKey,
-                senderRole = role,
-                senderName = name,
-                transactions = nonSecretTransactions,
-                fundSources = nonSecretFundNames,
-                actionType = "FULL_SYNC",
-                customRelayUrl = cloudMailboxRelayUrl.value
-            )
-
-            if (result.isSuccess) {
-                lastMailboxSyncTime.value = System.currentTimeMillis()
-                if (!silent) {
-                    _eventFlow.emit(UiEvent.ShowToast("Paket data (${nonSecretTransactions.size} transaksi) berhasil dititipkan ke Kotak Surat Cloud!"))
-                }
-            } else if (result.isFailure && !silent) {
-                _eventFlow.emit(UiEvent.ShowToast("Gagal titip ke Kotak Surat: ${result.exceptionOrNull()?.localizedMessage}"))
-            }
-        }
-    }
-
-    fun fetchFromCloudMailbox(silent: Boolean = false) {
-        viewModelScope.launch {
-            val npsn = schoolProfile.value.npsn.trim()
-            if (npsn.isBlank()) {
-                if (!silent) _eventFlow.emit(UiEvent.ShowToast("NPSN belum diisi. Sinkronisasi antar HP dinonaktifkan."))
-                return@launch
-            }
-            val pairingKey = schoolPairingKey.value.ifBlank { "BKU-$npsn" }
-            val role = currentRole.value
-
-            val result = cloudMailboxRepository.fetchAndMergeFromMailbox(
-                npsn = npsn,
-                pairingKey = pairingKey,
-                currentRole = role,
-                customRelayUrl = cloudMailboxRelayUrl.value,
-                onFundSourcesReceived = { incomingSources ->
-                    val currentList = customFundSources.value.toMutableList()
-                    var changed = false
-                    for (src in incomingSources) {
-                        if (currentList.none { it.name.equals(src, ignoreCase = true) }) {
-                            currentList.add(FundSourceModel(name = src, isSecret = false))
-                            changed = true
-                        }
-                    }
-                    if (changed) {
-                        customFundSources.value = currentList
-                        saveFundSourcesToPrefs(currentList)
-                    }
-                }
-            )
-
-            if (result.isSuccess) {
-                lastMailboxSyncTime.value = System.currentTimeMillis()
-                val count = result.getOrNull() ?: 0
-                if (!silent) {
-                    _eventFlow.emit(UiEvent.ShowToast("Berhasil mengambil paket dari Kotak Surat Cloud! ($count data diperbarui/baru)"))
-                }
-            } else if (result.isFailure && !silent) {
-                _eventFlow.emit(UiEvent.ShowToast(result.exceptionOrNull()?.localizedMessage ?: "Kotak Surat Cloud belum memiliki data."))
-            }
-        }
-    }
-
-    fun syncCloudMailbox(silent: Boolean = false) {
-        viewModelScope.launch {
-            val npsn = schoolProfile.value.npsn.trim()
-            if (npsn.isBlank()) {
-                if (!silent) _eventFlow.emit(UiEvent.ShowToast("NPSN belum diisi. Sinkronisasi antar HP dinonaktifkan."))
-                return@launch
-            }
-            val pairingKey = schoolPairingKey.value.ifBlank { "BKU-$npsn" }
-            val role = currentRole.value
-            val name = if (role == UserRole.BENDAHARA) schoolProfile.value.bendaharaName else schoolProfile.value.kepalaSekolahName
-
-            // Step 1: Tarik data masuk
-            val fetchResult = cloudMailboxRepository.fetchAndMergeFromMailbox(
-                npsn = npsn,
-                pairingKey = pairingKey,
-                currentRole = role,
-                customRelayUrl = cloudMailboxRelayUrl.value,
-                onFundSourcesReceived = { incomingSources ->
-                    val currentList = customFundSources.value.toMutableList()
-                    var changed = false
-                    for (src in incomingSources) {
-                        if (currentList.none { it.name.equals(src, ignoreCase = true) }) {
-                            currentList.add(FundSourceModel(name = src, isSecret = false))
-                            changed = true
-                        }
-                    }
-                    if (changed) {
-                        customFundSources.value = currentList
-                        saveFundSourcesToPrefs(currentList)
-                    }
-                }
-            )
-
-            // Step 2: Kirim data lokal terbaru ke kotak surat
-            val freshList = repository.getAllTransactionsSync()
-            val secretSources = customFundSources.value.filter { it.isSecret }.map { it.name }.toSet()
-            val nonSecretTransactions = freshList.filter { it.fundSource !in secretSources }
-            val nonSecretFundNames = customFundSources.value.filter { !it.isSecret }.map { it.name }
-
-            val pushResult = cloudMailboxRepository.sendPackageToMailbox(
-                npsn = npsn,
-                pairingKey = pairingKey,
-                senderRole = role,
-                senderName = name,
-                transactions = nonSecretTransactions,
-                fundSources = nonSecretFundNames,
-                actionType = "FULL_SYNC",
-                customRelayUrl = cloudMailboxRelayUrl.value
-            )
-
-            lastMailboxSyncTime.value = System.currentTimeMillis()
-
-            if (!silent) {
-                if (pushResult.isSuccess) {
-                    val count = fetchResult.getOrNull() ?: 0
-                    _eventFlow.emit(UiEvent.ShowToast("Sinkronisasi Kotak Surat Cloud Selesai! ($count diperbarui, ${nonSecretTransactions.size} terkirim)"))
-                } else {
-                    _eventFlow.emit(UiEvent.ShowToast("Gagal Sinkronisasi Kotak Surat: ${pushResult.exceptionOrNull()?.localizedMessage}"))
-                }
+    fun manualSync() {
+        val sheetsUrl = googleSheetsUrl.value.trim()
+        if (sheetsUrl.isNotBlank() && !sheetsUrl.contains("docs.google.com/spreadsheets")) {
+            syncAllToGoogleSheets()
+        } else {
+            viewModelScope.launch {
+                _eventFlow.emit(UiEvent.ShowToast("Silakan atur URL Google Sheets terlebih dahulu di menu pengaturan."))
             }
         }
     }
 
     private fun triggerAutoSyncIfConfigured() {
-        // 1. Kotak Surat Cloud (Cara B: Offline-First Cloud Mailbox)
-        viewModelScope.launch {
-            try {
-                sendToCloudMailbox(silent = true)
-            } catch (ignored: Exception) {}
-        }
-
         // 2. Google Sheets sync (jika URL dikonfigurasi)
         val url = googleSheetsUrl.value.trim()
+        val useGoogleSheets = url.isNotBlank() && !url.contains("docs.google.com/spreadsheets")
+
+        if (!useGoogleSheets) {
+            viewModelScope.launch {
+                try {
+                            } catch (ignored: Exception) {}
+            }
+        }
         if (url.isNotBlank() && !url.contains("docs.google.com/spreadsheets")) {
             viewModelScope.launch {
                 try {
@@ -881,13 +683,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            // If recorded by Bendahara, set status to VERIFIED or PENDING_APPROVAL based on threshold (>= Rp 50.000 requires Headmaster Approval)
-            val requiresApproval = (type == "PENGELUARAN" && amount >= 50000.0) && currentRole.value == UserRole.BENDAHARA
+            // Pengeluaran kas oleh Bendahara membutuhkan verifikasi & persetujuan Kepala Sekolah
+            val requiresApproval = (type == "PENGELUARAN") && currentRole.value == UserRole.BENDAHARA
             val approvalStatus = if (requiresApproval) "PENDING_APPROVAL" else "VERIFIED"
 
+            val activeUserName = userSession.value.userName.trim()
             val roleLabel = when (currentRole.value) {
-                UserRole.BENDAHARA -> "Bendahara"
-                UserRole.KEPALA_SEKOLAH -> "Kepala Sekolah"
+                UserRole.BENDAHARA -> {
+                    if (activeUserName.isNotBlank() && !activeUserName.equals("Bendahara", ignoreCase = true)) {
+                        "Bendahara ($activeUserName)"
+                    } else {
+                        "Bendahara"
+                    }
+                }
+                UserRole.KEPALA_SEKOLAH -> {
+                    if (activeUserName.isNotBlank() && !activeUserName.equals("Kepala Sekolah", ignoreCase = true)) {
+                        "Kepala Sekolah ($activeUserName)"
+                    } else {
+                        "Kepala Sekolah"
+                    }
+                }
             }
 
             val newTx = TransactionEntity(
@@ -922,7 +737,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val successMsg = if (requiresApproval) {
-                "Transaksi kas disimpan! Memerlukan verifikasi Kepsek (Nominal ≥ Rp 50.000)"
+                "Pengeluaran kas dicatat! Menunggu verifikasi & persetujuan Kepala Sekolah."
             } else {
                 "Transaksi kas berhasil dicatat & disinkronkan!"
             }
@@ -972,7 +787,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun syncNowSilently() {
         viewModelScope.launch {
             try {
-                fetchFromCloudMailbox(silent = true)
+                val url = googleSheetsUrl.value.trim()
+                if (url.isNotBlank() && !url.contains("docs.google.com/spreadsheets")) {
+                    val repo = bkuSyncRepository as? GoogleSheetsSyncRepository
+                    val fetchResult = repo?.fetchDetailedFromGoogleSheets(url)
+                    val sources = fetchResult?.getOrNull()?.fundSources ?: emptyList()
+                    if (sources.isNotEmpty()) {
+                        mergeCustomFundSources(sources)
+                    }
+                }
             } catch (ignored: Exception) {}
         }
     }
@@ -1063,43 +886,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun syncAllToGoogleSheets() {
         viewModelScope.launch {
-            val url = googleSheetsUrl.value
+            val url = googleSheetsUrl.value.trim()
             if (url.isBlank()) {
                 _eventFlow.emit(UiEvent.ShowToast("Silakan masukkan URL Google Apps Script Web App terlebih dahulu."))
                 return@launch
             }
-            val all = allTransactions.value
+            if (url.contains("docs.google.com/spreadsheets")) {
+                _eventFlow.emit(UiEvent.ShowToast("⚠️ Gunakan URL Web App (script.google.com/.../exec), bukan URL Spreadsheet!"))
+                return@launch
+            }
+
+            val repo = bkuSyncRepository as? GoogleSheetsSyncRepository
+
+            // Langkah 1: Tarik data terbaru dari Google Sheets terlebih dahulu agar pengeluaran dari perangkat lain tidak tertimpa
+            val fetchResult = repo?.fetchDetailedFromGoogleSheets(url)
+            val fetchedSources = fetchResult?.getOrNull()?.fundSources ?: emptyList()
+            if (fetchedSources.isNotEmpty()) {
+                mergeCustomFundSources(fetchedSources)
+            }
+
+            // Langkah 2: Ambil semua transaksi lokal terbaru (sudah ter-merge dengan Google Sheets)
+            val all = repository.allTransactions.first()
             val secretSources = customFundSources.value.filter { it.isSecret }.map { it.name }.toSet()
-            // Pos dana rahasia & transaksinya 100% TIDAK dikirim ke Google Sheets
             val nonSecretTransactions = all.filter { it.fundSource !in secretSources }
             val nonSecretFundNames = customFundSources.value.filter { !it.isSecret }.map { it.name }
 
-            if (nonSecretTransactions.isEmpty()) {
-                val repo = bkuSyncRepository as? GoogleSheetsSyncRepository
-                val fetchResult = repo?.fetchDetailedFromGoogleSheets(url)
-                if (fetchResult?.isSuccess == true) {
-                    val data = fetchResult.getOrNull()
-                    val txCount = data?.transactions?.size ?: 0
-                    val sources = data?.fundSources ?: emptyList()
-                    if (sources.isNotEmpty()) {
-                        mergeCustomFundSources(sources)
-                    }
-                    if (txCount > 0) {
-                        _eventFlow.emit(UiEvent.ShowToast("Data lokal kosong. Mengunduh $txCount transaksi & ${nonSecretFundNames.size} Pos Dana dari Google Sheets."))
-                    } else {
-                        _eventFlow.emit(UiEvent.ShowToast("Tidak ada transaksi di Google Sheets."))
-                    }
-                } else {
-                    _eventFlow.emit(UiEvent.ShowToast("Tidak ada transaksi publik untuk dikirim ke Google Sheets."))
+            if (nonSecretTransactions.isNotEmpty()) {
+                val result = repo?.syncToGoogleSheets(url, nonSecretTransactions, nonSecretFundNames) ?: bkuSyncRepository?.syncToGoogleSheets(url, nonSecretTransactions)
+                if (result?.isSuccess == true) {
+                    _eventFlow.emit(UiEvent.ShowToast("Sinkronisasi berhasil! ${nonSecretTransactions.size} transaksi terhubung dengan Google Sheets."))
+                } else if (result?.isFailure == true) {
+                    _eventFlow.emit(UiEvent.ShowToast("Gagal Sync Google Sheets: ${result.exceptionOrNull()?.localizedMessage}"))
                 }
-                return@launch
-            }
-            val repo = bkuSyncRepository as? GoogleSheetsSyncRepository
-            val result = repo?.syncToGoogleSheets(url, nonSecretTransactions, nonSecretFundNames) ?: bkuSyncRepository?.syncToGoogleSheets(url, nonSecretTransactions)
-            if (result?.isSuccess == true) {
-                _eventFlow.emit(UiEvent.ShowToast("Berhasil menyinkronkan ${result.getOrNull()} transaksi & ${nonSecretFundNames.size} Pos Dana publik ke Google Sheets"))
-            } else if (result?.isFailure == true) {
-                _eventFlow.emit(UiEvent.ShowToast("Gagal Sync Google Sheets: ${result.exceptionOrNull()?.localizedMessage}"))
+            } else {
+                _eventFlow.emit(UiEvent.ShowToast("Sinkronisasi selesai. Belum ada transaksi kas publik untuk disinkronkan."))
             }
         }
     }

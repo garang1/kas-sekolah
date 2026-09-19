@@ -1,18 +1,18 @@
 package com.example.ui.components
 
+import android.annotation.SuppressLint
 import android.view.ViewGroup
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,11 +34,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 
-/**
- * Live Camera Preview with Scanner Target Reticle
- */
 @Composable
 fun CameraQrScannerView(
     modifier: Modifier = Modifier,
@@ -79,7 +80,43 @@ fun CameraQrScannerView(
 
                     val imageAnalysis = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .setTargetResolution(android.util.Size(1280, 720))
                         .build()
+                        
+                    val scannerOptions = BarcodeScannerOptions.Builder()
+                        .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                        .build()
+                    val scanner = BarcodeScanning.getClient(scannerOptions)
+                    var isProcessing = false
+
+                    imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy: ImageProxy ->
+                        if (isProcessing) {
+                            imageProxy.close()
+                            return@setAnalyzer
+                        }
+                        @SuppressLint("UnsafeOptInUsageError")
+                        val mediaImage = imageProxy.image
+                        if (mediaImage != null) {
+                            isProcessing = true
+                            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                            scanner.process(image)
+                                .addOnSuccessListener { barcodes ->
+                                    for (barcode in barcodes) {
+                                        barcode.rawValue?.let { value ->
+                                            if (value.isNotBlank()) {
+                                                onQrDetected(value)
+                                            }
+                                        }
+                                    }
+                                }
+                                .addOnCompleteListener {
+                                    isProcessing = false
+                                    imageProxy.close()
+                                }
+                        } else {
+                            imageProxy.close()
+                        }
+                    }
 
                     val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
@@ -94,6 +131,7 @@ fun CameraQrScannerView(
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
+
                 }, ContextCompat.getMainExecutor(ctx))
 
                 previewView
@@ -109,12 +147,7 @@ fun CameraQrScannerView(
             val left = (canvasWidth - boxSize) / 2
             val top = (canvasHeight - boxSize) / 2
 
-            // Dark semi-transparent background
-            drawRect(
-                color = Color.Black.copy(alpha = 0.45f)
-            )
-
-            // Clear center scanner viewfinder box
+            drawRect(color = Color.Black.copy(alpha = 0.45f))
             drawRoundRect(
                 color = Color.Transparent,
                 topLeft = Offset(left, top),
@@ -122,8 +155,6 @@ fun CameraQrScannerView(
                 cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx()),
                 blendMode = BlendMode.Clear
             )
-
-            // Neon cyan / emerald focus border
             drawRoundRect(
                 color = Color(0xFF10B981),
                 topLeft = Offset(left, top),

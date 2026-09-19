@@ -203,7 +203,7 @@ fun TransactionEntryScreen(
                         )
                         Text(
                             text = if (currentRole == com.example.data.model.UserRole.BENDAHARA)
-                                "Otoritas Bendahara • Transaksi dicatat langsung ke Buku Kas Umum"
+                                "Otoritas Bendahara • Semua pengeluaran wajib verifikasi & persetujuan Kepala Sekolah"
                             else
                                 "Otoritas Kepala Sekolah • Transaksi diverifikasi langsung",
                             fontSize = 10.sp,

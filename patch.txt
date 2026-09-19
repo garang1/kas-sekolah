@@ -1,0 +1,16 @@
+--- app/src/main/java/com/example/viewmodel/MainViewModel.kt
++++ app/src/main/java/com/example/viewmodel/MainViewModel.kt
+@@ -474,2 +474,13 @@
+ 
++    fun manualSync() {
++        val sheetsUrl = googleSheetsUrl.value.trim()
++        if (sheetsUrl.isNotBlank() && !sheetsUrl.contains("docs.google.com/spreadsheets")) {
++            // Gunakan Google Sheets jika URL dikonfigurasi (prioritas)
++            syncAllToGoogleSheets()
++        } else {
++            // Jika tidak, gunakan Cloud Mailbox (pairing antar HP)
++            fetchFromCloudMailbox(silent = false)
++        }
++    }
++
+     fun fetchFromCloudMailbox(silent: Boolean = false) {

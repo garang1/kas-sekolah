@@ -80,8 +80,6 @@ fun SchoolAccountDialog(
     schoolProfile: SchoolProfile,
     userSession: UserAccountSession,
     deviceRoleLock: String = "ALL",
-    schoolPairingKey: String = "BKU-10103214",
-    cloudMailboxRelayUrl: String = "",
     googleSheetsUrl: String,
     spreadsheetDocUrl: String = "",
     customFundSources: List<FundSourceModel> = FundSourceDefaults.DEFAULT_FUND_MODELS,
@@ -89,11 +87,7 @@ fun SchoolAccountDialog(
     onLoginAccount: (UserRole, String, String) -> Boolean,
     onSetDeviceRoleLock: (String) -> Unit = {},
     onUpdateProfile: (SchoolProfile) -> Unit,
-    onOpenQrPairing: () -> Unit = {},
-    onSavePairingKey: (pairingKey: String, customRelay: String) -> Unit = { _, _ -> },
-    onSendToCloudMailbox: () -> Unit = {},
-    onFetchFromCloudMailbox: () -> Unit = {},
-    onSyncCloudMailbox: () -> Unit = {},
+    onOpenGoogleSheetsSetup: () -> Unit = {},
     onSaveGoogleSheetsUrl: (String, String) -> Unit = { _, _ -> },
     onUpdatePin: (UserRole, String) -> Unit,
     onUpdateFundSources: (List<FundSourceModel>) -> Unit = {},
@@ -104,7 +98,7 @@ fun SchoolAccountDialog(
     onRestoreData: (android.net.Uri) -> Unit = {}
 ) {
     val context = LocalContext.current
-    var selectedTab by remember { mutableStateOf(0) } // 0: Login, 1: Profil, 2: Pos Dana, 3: Kotak Surat Cloud, 4: Google Sheets, 5: Info
+    var selectedTab by remember { mutableStateOf(0) } // 0: Login, 1: Profil, 2: Pos Dana, 3: Info
 
     val backupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")

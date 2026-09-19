@@ -52,6 +52,12 @@ import com.example.viewmodel.UiEvent
 import java.text.NumberFormat
 import java.util.Locale
 
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.ExistingPeriodicWorkPolicy
+import java.util.concurrent.TimeUnit
+import com.example.worker.SyncWorker
+
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
@@ -62,6 +68,15 @@ class MainActivity : ComponentActivity() {
 
         // Inisialisasi Notification Channel
         com.example.util.AppNotificationHelper.createNotificationChannel(this)
+
+        // Setup Background Sync Worker for Push Notifications simulation
+        val syncWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "bku_sync_worker",
+            ExistingPeriodicWorkPolicy.KEEP,
+            syncWorkRequest
+        )
 
         // Minta Izin Notifikasi untuk Android 13+ (Tiramisu)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -106,12 +121,10 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
     val deviceRoleLock by viewModel.deviceRoleLock.collectAsStateWithLifecycle()
     val isAppUnlocked by viewModel.isAppUnlocked.collectAsStateWithLifecycle()
     val bkuReportState by viewModel.bkuReportState.collectAsStateWithLifecycle()
-    val schoolPairingKey by viewModel.schoolPairingKey.collectAsStateWithLifecycle()
-    val cloudMailboxRelayUrl by viewModel.cloudMailboxRelayUrl.collectAsStateWithLifecycle()
 
     var activeTab by remember { mutableStateOf(0) } // 0: Dashboard, 1: Entry, 2: Approval, 3: Report
     var showAccountDialog by remember { mutableStateOf(false) }
-    var showQrPairingDialog by remember { mutableStateOf(false) }
+    var showGoogleSheetsDialog by remember { mutableStateOf(false) }
     var selectedReceiptTx by remember { mutableStateOf<TransactionEntity?>(null) }
 
     // Saldo Tidak Cukup Warning Alert Dialog
@@ -240,7 +253,11 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                     pendingTransactionsCount = pendingTransactions.size,
                     onRoleSwitched = { role -> viewModel.switchRole(role) },
                     onOpenAccountDialog = { showAccountDialog = true },
-                    onOpenQrPairing = { showQrPairingDialog = true },
+                    onSyncNow = { viewModel.manualSync() },
+                    onOpenGoogleSheetsSetup = {
+                        
+                        showGoogleSheetsDialog = true
+                    },
                     onLockApp = { viewModel.lockApp() },
                     onNavigateToEntry = { activeTab = 1 },
                     onNavigateToApproval = { activeTab = 2 },
@@ -298,8 +315,6 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                 schoolProfile = schoolProfile,
                 userSession = userSession,
                 deviceRoleLock = deviceRoleLock,
-                schoolPairingKey = schoolPairingKey,
-                cloudMailboxRelayUrl = cloudMailboxRelayUrl,
                 googleSheetsUrl = googleSheetsUrl,
                 spreadsheetDocUrl = spreadsheetDocUrl,
                 customFundSources = customFundSources,
@@ -307,11 +322,10 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                 onLoginAccount = { role, name, pin -> viewModel.loginUserAccount(role, name, pin) },
                 onSetDeviceRoleLock = { lockMode -> viewModel.setDeviceRoleLock(lockMode) },
                 onUpdateProfile = { profile -> viewModel.updateSchoolProfile(profile) },
-                onOpenQrPairing = { showQrPairingDialog = true },
-                onSavePairingKey = { key, relay -> viewModel.setSchoolPairingKey(key, relay) },
-                onSendToCloudMailbox = { viewModel.sendToCloudMailbox() },
-                onFetchFromCloudMailbox = { viewModel.fetchFromCloudMailbox() },
-                onSyncCloudMailbox = { viewModel.syncCloudMailbox() },
+                    onOpenGoogleSheetsSetup = {
+                    
+                    showGoogleSheetsDialog = true
+                },
                 onSaveGoogleSheetsUrl = { scriptUrl, docUrl -> viewModel.saveGoogleSheetsUrl(scriptUrl, docUrl) },
                 onUpdatePin = { role, newPin -> viewModel.updatePin(role, newPin) },
                 onUpdateFundSources = { list -> viewModel.updateFundSources(list) },
@@ -323,17 +337,18 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
             )
         }
 
-        // QR Code Pairing Dialog Modal (Cara 1: Scan QR Code Pairing WA-Web style)
-        if (showQrPairingDialog) {
-            com.example.ui.components.QrPairingDialog(
-                schoolProfile = schoolProfile,
-                pairingKey = schoolPairingKey,
-                relayUrl = cloudMailboxRelayUrl,
-                currentRole = currentRole,
-                onPairingConfirmed = { npsn, name, key, relay ->
-                    viewModel.applyQrPairingData(npsn, name, key, relay)
+        // Google Sheets Setup Dialog Modal
+        if (showGoogleSheetsDialog) {
+            val googleSheetsUrl by viewModel.googleSheetsUrl.collectAsStateWithLifecycle()
+            val spreadsheetDocUrl by viewModel.spreadsheetDocUrl.collectAsStateWithLifecycle()
+            
+            com.example.ui.components.GoogleSheetsSetupDialog(
+                googleSheetsUrl = googleSheetsUrl,
+                spreadsheetDocUrl = spreadsheetDocUrl,
+                onSaveGoogleSheetsUrl = { scriptUrl, docUrl -> 
+                    viewModel.saveGoogleSheetsUrl(scriptUrl, docUrl) 
                 },
-                onDismiss = { showQrPairingDialog = false }
+                onDismiss = { showGoogleSheetsDialog = false }
             )
         }
 

@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -59,7 +61,8 @@ fun HeaderSchoolBanner(
     schoolProfile: SchoolProfile = SchoolProfile(),
     userSession: UserAccountSession = UserAccountSession(),
     onOpenAccountDialog: () -> Unit = {},
-    onOpenQrPairing: () -> Unit = {},
+    onOpenGoogleSheetsSetup: () -> Unit = {},
+    onSyncNow: () -> Unit = {},
     onLockApp: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -145,6 +148,25 @@ fun HeaderSchoolBanner(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Manual Sync Button
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.25f),
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable { onSyncNow() }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Sync,
+                                    contentDescription = "Sync Sekarang",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
                         // Quick QR Code Pairing Button
                         Surface(
                             shape = CircleShape,
@@ -152,12 +174,12 @@ fun HeaderSchoolBanner(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .clickable { onOpenQrPairing() }
+                                .clickable { onOpenGoogleSheetsSetup() }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Default.QrCodeScanner,
-                                    contentDescription = "QR Pairing",
+                                    imageVector = Icons.Default.CloudSync,
+                                    contentDescription = "Google Sheets Setup",
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )

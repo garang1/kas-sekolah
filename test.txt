@@ -1,0 +1,2 @@
+{"id":"lmIfqk4PwFDA","time":1788399475,"expires":1788442675,"event":"message","topic":"simpas_test_bku_12345","message":"test payload"}
+{"id":"8iZQeVzUMGFg","time":1788399487,"expires":1788442687,"event":"message","topic":"simpas_test_bku_12345","message":"second payload"}

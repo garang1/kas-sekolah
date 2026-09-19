@@ -295,12 +295,32 @@ function saveCustomFundSources(ss, sources) {
     var sheet = ss.getSheetByName('_CONFIG_POS_DANA') || ss.insertSheet('_CONFIG_POS_DANA');
     sheet.clear();
     sheet.appendRow(["Pos Sumber Dana"]);
+    
+    var bkuHeaders = ["No", "No ID Transaksi", "Tanggal", "Sumber Dana", "Uraian Transaksi", "Volume", "Satuan", "Harga Satuan (Rp)", "Pemasukan (Rp)", "Pengeluaran (Rp)", "Saldo Kas (Rp)", "Status Verifikasi", "Pencatat", "Catatan"];
+    var rkasHeaders = ["No", "ID", "Uraian Belanja", "Volume", "Satuan", "Tarif Satuan (Rp)", "Jumlah Pagu (Rp)", "Sumber Dana"];
+
     sources.forEach(function(s) {
       if (s && String(s).trim()) {
-        sheet.appendRow([String(s).trim()]);
+        var src = String(s).trim();
+        sheet.appendRow([src]);
+        
+        var bkuName = 'BKU_' + src.replace(/[\/\\?\*\[\]]/g, '_').trim();
+        if (!ss.getSheetByName(bkuName)) {
+            var bkuSheet = ss.insertSheet(bkuName);
+            bkuSheet.appendRow(bkuHeaders);
+            bkuSheet.getRange(1, 1, 1, bkuHeaders.length).setFontWeight("bold").setBackground("#1E40AF").setFontColor("#FFFFFF");
+        }
+        
+        var rkasName = 'RKAS_' + src.replace(/[\/\\?\*\[\]]/g, '_').trim();
+        if (!ss.getSheetByName(rkasName)) {
+            var rkasSheet = ss.insertSheet(rkasName);
+            rkasSheet.appendRow(rkasHeaders);
+            rkasSheet.getRange(1, 1, 1, rkasHeaders.length).setFontWeight("bold").setBackground("#059669").setFontColor("#FFFFFF");
+        }
       }
     });
     sheet.hideSheet();
+    if (typeof cleanupDefaultSheet === 'function') cleanupDefaultSheet(ss);
   } catch (e) {}
 }
 
@@ -576,8 +596,8 @@ function doGet(e) {
         else if (h.indexOf('masuk') !== -1 || h.indexOf('terima') !== -1 || h.indexOf('penerimaan') !== -1) colMap.inc = c;
         else if (h.indexOf('keluar') !== -1 || h.indexOf('pengeluaran') !== -1 || h.indexOf('belanja') !== -1) colMap.exp = c;
         else if (h.indexOf('status') !== -1 || h.indexOf('verifikasi') !== -1) colMap.status = c;
-        else if (h.indexOf('catat') !== -1 || h.indexOf('role') !== -1) colMap.role = c;
         else if (h.indexOf('catatan') !== -1 || h.indexOf('bukti') !== -1 || h.indexOf('ket') !== -1) colMap.notes = c;
+        else if (h.indexOf('catat') !== -1 || h.indexOf('pencatat') !== -1 || h.indexOf('role') !== -1) colMap.role = c;
       }
 
       if (colMap.inc === -1 && colMap.exp === -1) {
@@ -1176,6 +1196,14 @@ function cleanupDefaultSheet(ss) {
                             val sat = it.optString("unitName", it.optString("satuan", "buah"))
                             val price = it.optDouble("unitPrice", 0.0)
                             val amt = it.optDouble("amount", 0.0)
+                            val rawStatus = it.optString("approvalStatus", "VERIFIED")
+                            val cleanStatus = when {
+                                rawStatus.contains("PENDING", ignoreCase = true) || rawStatus.contains("MENUNGGU", ignoreCase = true) -> "PENDING_APPROVAL"
+                                rawStatus.contains("TOLAK", ignoreCase = true) -> "DITOLAK"
+                                else -> "VERIFIED"
+                            }
+                            val rawRole = it.optString("recordedByRole", "Bendahara")
+                            val cleanRole = if (rawRole.contains("kepala", ignoreCase = true) || rawRole.contains("kepsek", ignoreCase = true)) "Kepala Sekolah" else "Bendahara"
 
                             fetchedList.add(
                                 TransactionEntity(
@@ -1191,8 +1219,8 @@ function cleanupDefaultSheet(ss) {
                                     date = it.optLong("date", System.currentTimeMillis()),
                                     notes = it.optString("notes", ""),
                                     receiptUri = it.optString("receiptUri", null.toString()).takeIf { s -> s != "null" && s.isNotBlank() },
-                                    approvalStatus = it.optString("approvalStatus", "VERIFIED"),
-                                    recordedByRole = it.optString("recordedByRole", "Bendahara"),
+                                    approvalStatus = cleanStatus,
+                                    recordedByRole = cleanRole,
                                     createdAt = it.optLong("createdAt", System.currentTimeMillis())
                                 )
                             )
@@ -1214,13 +1242,61 @@ function cleanupDefaultSheet(ss) {
                         fetchedList.addAll(list)
                     }
 
-                    // Kumpulkan semua fund sources dari transaksi yang diunduh
+                    // Sinkronkan dan gabungkan transaksi dari Google Sheets dengan aman ke database lokal
+                    val localTransactions = transactionDao.getAllTransactionsSync()
+                    val localMapById = localTransactions.associateBy { it.id }
+
                     fetchedList.forEach { tx ->
                         val src = tx.fundSource.trim()
                         if (src.isNotBlank() && !fundSourcesList.contains(src)) {
                             fundSourcesList.add(src)
                         }
-                        transactionDao.insertTransaction(tx)
+
+                        // Cek apakah transaksi sudah ada secara lokal berdasarkan konten yang sama
+                        val matchByContent = localTransactions.find { local ->
+                            local.title.trim().equals(tx.title.trim(), ignoreCase = true) &&
+                            local.amount == tx.amount &&
+                            local.fundSource.trim().equals(tx.fundSource.trim(), ignoreCase = true) &&
+                            local.type == tx.type &&
+                            kotlin.math.abs(local.date - tx.date) < 86400000L
+                        }
+
+                        val matchById = localMapById[tx.id]
+
+                        val targetTx = when {
+                            matchByContent != null -> {
+                                // Transaksi sudah ada, perbarui status verifikasi/approval dari Google Sheets
+                                matchByContent.copy(
+                                    approvalStatus = tx.approvalStatus,
+                                    volume = tx.volume,
+                                    unitName = tx.unitName,
+                                    unitPrice = tx.unitPrice,
+                                    notes = if (tx.notes.isNotBlank()) tx.notes else matchByContent.notes,
+                                    recordedByRole = tx.recordedByRole
+                                )
+                            }
+                            matchById != null -> {
+                                // ID sama: jika judul atau nominal sama maka update, jika tidak berikan id = 0 agar autoincrement
+                                if (matchById.title.trim().equals(tx.title.trim(), ignoreCase = true) || matchById.amount == tx.amount) {
+                                    matchById.copy(
+                                        approvalStatus = tx.approvalStatus,
+                                        volume = tx.volume,
+                                        unitName = tx.unitName,
+                                        unitPrice = tx.unitPrice,
+                                        notes = if (tx.notes.isNotBlank()) tx.notes else matchById.notes,
+                                        recordedByRole = tx.recordedByRole
+                                    )
+                                } else {
+                                    tx.copy(id = 0)
+                                }
+                            }
+                            else -> {
+                                // Transaksi baru dari perangkat lain (misal pengeluaran bendahara)
+                                tx
+                            }
+                        }
+
+                        transactionDao.insertTransaction(targetTx)
                     }
 
                     val msg = "Berhasil mengunduh ${fetchedList.size} transaksi & ${fundSourcesList.size} Pos Sumber Dana dari Google Sheets"

@@ -61,7 +61,7 @@ object AppNotificationHelper {
             "🔴 Pengeluaran Kas Baru: $formattedAmount"
         }
 
-        val approvalSuffix = if (amount >= 50000.0) " (perlu persetujuan kepala sekolah)" else ""
+        val approvalSuffix = if (!isIncome && recordedBy.contains("Bendahara", ignoreCase = true)) " (menunggu persetujuan kepala sekolah)" else ""
         val notifBody = "$title • $fundSource$approvalSuffix"
 
         val intent = Intent(context, MainActivity::class.java).apply {
