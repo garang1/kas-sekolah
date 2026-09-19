@@ -19,17 +19,24 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Set up Android SDK
-      uses: android-actions/setup-android@v3
+    # ubuntu-latest already includes the Android SDK. The setup-android action
+    # currently tries to install the obsolete `tools` package and fails before
+    # Gradle can start, so use the runner's maintained SDK installation.
+    - name: Verify Android SDK
+      run: |
+        echo "ANDROID_HOME=${ANDROID_HOME}"
+        "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version || true
+        "$ANDROID_HOME/platform-tools/adb" version || true
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
     - name: Build Debug APK with Gradle
-      run: gradle assembleDebug --stacktrace
+      run: gradle assembleDebug --stacktrace --no-daemon
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: Kas-Simapas-APK
         path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: error
