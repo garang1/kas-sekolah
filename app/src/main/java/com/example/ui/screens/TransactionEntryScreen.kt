@@ -658,6 +658,15 @@ fun TransactionEntryScreen(
                     val parts = listOf(notes, proofSummary).filter { it.isNotBlank() }
                     val finalNotes = parts.joinToString(" • ")
 
+                    val rawUnit = unitText.trim()
+                    val isIncome = type == "PEMASUKAN"
+                    val isRupiahOrNum = rawUnit.startsWith("Rp", ignoreCase = true) || rawUnit.matches(Regex("^[0-9.,\\s]+$"))
+                    val cleanUnit = if (isRupiahOrNum || rawUnit.isBlank()) {
+                        if (isIncome) "transaksi" else "buah"
+                    } else {
+                        rawUnit
+                    }
+
                     onSubmitTransaction(
                         title.trim(),
                         calculatedTotalAmount,
@@ -665,7 +674,7 @@ fun TransactionEntryScreen(
                         fundSource,
                         "Umum",
                         if (parsedVolume > 0) parsedVolume else 1.0,
-                        unitText.ifBlank { "buah" },
+                        cleanUnit,
                         if (parsedUnitPrice > 0) parsedUnitPrice else calculatedTotalAmount,
                         finalNotes,
                         proofSummary,

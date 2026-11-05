@@ -239,14 +239,16 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Fund Filter Chips
-                    val fundTabs = activeSources
+                    // Fund Filter Chips (Semua Kas & Tiap Pos Dana)
+                    val fundTabs = remember(activeSources) {
+                        listOf("Semua") + activeSources.filter { !it.equals("Semua", ignoreCase = true) }
+                    }
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(horizontal = 16.dp)
                     ) {
                         items(fundTabs) { tab ->
-                            val isSelected = selectedFundFilter == tab
+                            val isSelected = (selectedFundFilter.isBlank() && tab == "Semua") || selectedFundFilter.equals(tab, ignoreCase = true)
                             Surface(
                                 shape = RoundedCornerShape(20.dp),
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
@@ -532,9 +534,35 @@ fun TransactionRowItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = transaction.title,
+                    text = transaction.title.ifBlank { if (transaction.type == "PEMASUKAN") "Penerimaan Kas" else "Pengeluaran Kas" },
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
+
+                // Tampilkan Catatan / Keterangan dari Google Sheets jika ada
+                if (transaction.notes.isNotBlank() && !transaction.notes.equals(transaction.title, ignoreCase = true)) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = transaction.notes,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    )
+                }
+
+                // Tampilkan rincian volume & harga satuan jika ada
+                if (transaction.volume > 0 && transaction.unitPrice > 0) {
+                    val volStr = if (transaction.volume % 1.0 == 0.0) transaction.volume.toInt().toString() else transaction.volume.toString()
+                    val satStr = transaction.unitName.ifBlank { "buah" }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Rincian: $volStr $satStr @ ${currencyFormatter.format(transaction.unitPrice)}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = Color(0xFF6B7280),
+                            fontSize = 11.sp
+                        )
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -572,7 +600,7 @@ fun TransactionRowItem(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Tanggal (Vertikal)
+                // Tanggal
                 Text(
                     text = dateFormatter.format(Date(transaction.date)),
                     style = MaterialTheme.typography.bodySmall.copy(color = Color.Gray, fontSize = 11.sp)

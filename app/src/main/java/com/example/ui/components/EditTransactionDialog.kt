@@ -370,13 +370,22 @@ fun EditTransactionDialog(
                     Button(
                         onClick = {
                             if (isValid) {
+                                val rawUnit = unitText.trim()
+                                val isIncome = type == "PEMASUKAN"
+                                val isRupiahOrNum = rawUnit.startsWith("Rp", ignoreCase = true) || rawUnit.matches(Regex("^[0-9.,\\s]+$"))
+                                val cleanUnit = if (isRupiahOrNum || rawUnit.isBlank()) {
+                                    if (isIncome) "transaksi" else "buah"
+                                } else {
+                                    rawUnit
+                                }
+
                                 val updated = transaction.copy(
                                     title = title.trim(),
                                     amount = calculatedTotalAmount,
                                     type = type,
                                     fundSource = fundSource,
                                     volume = if (parsedVolume > 0) parsedVolume else 1.0,
-                                    unitName = unitText.ifBlank { "buah" },
+                                    unitName = cleanUnit,
                                     unitPrice = if (parsedUnitPrice > 0) parsedUnitPrice else calculatedTotalAmount,
                                     notes = notes.trim(),
                                     date = selectedDateMillis

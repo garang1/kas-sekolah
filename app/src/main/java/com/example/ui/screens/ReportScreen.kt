@@ -109,7 +109,11 @@ fun ReportScreen(
     val clipboardManager = LocalClipboardManager.current
     var subTab by remember { mutableStateOf(0) }
 
-    val selectedFundSource = bkuReportState.selectedFundSource.ifBlank { fundSources.firstOrNull() ?: "BOS Reguler" }
+    val selectedFundSource = if (fundSources.contains(bkuReportState.selectedFundSource)) {
+        bkuReportState.selectedFundSource
+    } else {
+        fundSources.firstOrNull() ?: "BOS Reguler"
+    }
     var showDeleteAllConfirmDialog by remember { mutableStateOf(false) }
 
     val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {

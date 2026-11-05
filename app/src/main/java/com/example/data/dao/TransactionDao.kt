@@ -22,8 +22,8 @@ interface TransactionDao {
 
     @Query("""
         SELECT * FROM transactions 
-        WHERE fundSource = :fundSource
-        AND (:searchQuery = '' OR title LIKE '%' || :searchQuery || '%')
+        WHERE (:fundSource = '' OR :fundSource = 'Semua' OR :fundSource = 'Semua Kas' OR fundSource = :fundSource)
+        AND (:searchQuery = '' OR title LIKE '%' || :searchQuery || '%' OR notes LIKE '%' || :searchQuery || '%' OR fundSource LIKE '%' || :searchQuery || '%')
         ORDER BY date DESC, id DESC 
         LIMIT :limit OFFSET :offset
     """)

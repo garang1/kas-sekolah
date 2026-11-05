@@ -80,7 +80,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val userSession = MutableStateFlow(com.example.data.model.UserAccountSession())
 
 
-    val selectedFundFilter = MutableStateFlow("BOS Reguler")
+    val selectedFundFilter = MutableStateFlow("Semua")
     val selectedCategoryFilter = MutableStateFlow("")
     val googleSheetsUrl = MutableStateFlow("") // Apps Script Web App URL for Sync
     val spreadsheetDocUrl = MutableStateFlow("") // Direct Google Spreadsheet URL for opening/editing
@@ -192,15 +192,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // OTOMATIS PENUH: Background Auto-Sync loop tanpa perlu klik tombol manual
             viewModelScope.launch {
                 // Fetch saat aplikasi pertama kali dibuka
-                kotlinx.coroutines.delay(1000)
+                kotlinx.coroutines.delay(1500)
                 try {
+                    val url = googleSheetsUrl.value.trim()
+                    if (url.isNotBlank() && !url.contains("docs.google.com/spreadsheets")) {
+                        syncNowSilently()
+                    }
                 } catch (ignored: Exception) {}
 
-                // Cek data masuk setiap 6 detik secara senyap di latar belakang
+                // Cek data masuk atau perubahan/penghapusan dari Google Sheets setiap 10 detik secara senyap di latar belakang
                 while (kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.isActive == true) {
-                    kotlinx.coroutines.delay(6000)
+                    kotlinx.coroutines.delay(10000)
                     try {
-                        } catch (ignored: Exception) {}
+                        val url = googleSheetsUrl.value.trim()
+                        if (url.isNotBlank() && !url.contains("docs.google.com/spreadsheets")) {
+                            syncNowSilently()
+                        }
+                    } catch (ignored: Exception) {}
                 }
             }
         } catch (e: Exception) {
@@ -454,7 +462,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         pageSize
     ) { fund, query, page, size ->
         val totalLimit = (page + 1) * size
-        val effectiveFund = fund.ifBlank { "BOS Reguler" }
+        val effectiveFund = if (fund.isBlank() || fund.equals("Semua", ignoreCase = true) || fund.equals("Semua Kas", ignoreCase = true)) "" else fund
         Triple(effectiveFund, query.trim(), totalLimit)
     }.flatMapLatest { (fund, query, limit) ->
         repository.getTransactionsPaged(
@@ -613,21 +621,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun mergeCustomFundSources(newSources: List<String>) {
-        val current = customFundSources.value.toMutableList()
-        var changed = false
-        val existingNames = current.map { it.name }.toSet()
-        newSources.forEach { src ->
-            val clean = src.trim()
-            if (clean.isNotBlank() && !existingNames.contains(clean)) {
-                current.add(FundSourceModel(name = clean, isSecret = false))
-                changed = true
+    fun syncFundSourcesFromSheets(fetchedSources: List<String>) {
+        if (fetchedSources.isEmpty()) return
+        val fetchedSet = fetchedSources.map { it.trim() }.filter { it.isNotBlank() }.toSet()
+        val current = customFundSources.value
+
+        // Simpan sumber dana rahasia milik Kepala Sekolah agar tidak terhapus
+        val secretFunds = current.filter { it.isSecret }
+
+        // Pos dana non-rahasia: hanya pertahankan yang masih aktif di Google Sheets
+        val updatedList = mutableListOf<FundSourceModel>()
+        val addedNames = mutableSetOf<String>()
+
+        current.filter { !it.isSecret }.forEach { model ->
+            if (fetchedSet.contains(model.name)) {
+                updatedList.add(model)
+                addedNames.add(model.name)
             }
         }
-        if (changed) {
-            customFundSources.value = current
-            saveFundSourcesToPrefs(current)
+
+        // Tambahkan jika ada pos dana baru dari Google Sheets
+        fetchedSources.forEach { src ->
+            val clean = src.trim()
+            if (clean.isNotBlank() && !addedNames.contains(clean)) {
+                updatedList.add(FundSourceModel(name = clean, isSecret = false))
+                addedNames.add(clean)
+            }
         }
+
+        // Pastikan pos rahasia tetap utuh
+        secretFunds.forEach { sf ->
+            if (!updatedList.any { it.name == sf.name }) {
+                updatedList.add(sf)
+            }
+        }
+
+        val deletedNonSecretFunds = current.filter { !it.isSecret && !fetchedSet.contains(it.name) }.map { it.name }
+
+        customFundSources.value = updatedList
+        saveFundSourcesToPrefs(updatedList)
+
+        // Jika ada Judul Kas yang dihapus di Google Sheets, hapus semua transaksi lokal yang terkait
+        if (deletedNonSecretFunds.isNotEmpty()) {
+            viewModelScope.launch {
+                val allLocal = repository.allTransactions.first()
+                val txsToDelete = allLocal.filter { it.fundSource in deletedNonSecretFunds }
+                txsToDelete.forEach { tx ->
+                    repository.deleteTransaction(tx)
+                }
+            }
+        }
+    }
+
+    fun mergeCustomFundSources(newSources: List<String>) {
+        syncFundSourcesFromSheets(newSources)
     }
 
     fun renameFundSource(oldName: String, newName: String) {
@@ -705,6 +752,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            val rawUnit = unitName.trim()
+            val isRupiahOrNumeric = rawUnit.startsWith("Rp", ignoreCase = true) || rawUnit.matches(Regex("^[0-9.,\\s]+$"))
+            val effectiveUnit = if (isRupiahOrNumeric || rawUnit.isBlank()) {
+                if (type == "PEMASUKAN") "transaksi" else "buah"
+            } else {
+                rawUnit
+            }
+            var effectivePrice = unitPrice
+            if (isRupiahOrNumeric && effectivePrice <= 0.0) {
+                val extracted = rawUnit.replace("[^0-9.]".toRegex(), "").toDoubleOrNull() ?: 0.0
+                if (extracted > 0.0) effectivePrice = extracted
+            }
+            if (effectivePrice <= 0.0) {
+                val vol = if (volume > 0.0) volume else 1.0
+                effectivePrice = amount / vol
+            }
+
             val newTx = TransactionEntity(
                 title = title.ifBlank { "Transaksi Kas" },
                 amount = amount,
@@ -712,8 +776,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 fundSource = fundSource,
                 category = category,
                 volume = volume,
-                unitName = unitName,
-                unitPrice = unitPrice,
+                unitName = effectiveUnit,
+                unitPrice = effectivePrice,
                 date = date,
                 notes = notes,
                 receiptUri = receiptUri,
@@ -778,7 +842,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateTransaction(transaction: TransactionEntity) {
         viewModelScope.launch {
-            repository.updateTransaction(transaction)
+            val rawUnit = transaction.unitName.trim()
+            val isRupiahOrNumeric = rawUnit.startsWith("Rp", ignoreCase = true) || rawUnit.matches(Regex("^[0-9.,\\s]+$"))
+            val effectiveUnit = if (isRupiahOrNumeric || rawUnit.isBlank()) {
+                if (transaction.type == "PEMASUKAN") "transaksi" else "buah"
+            } else {
+                rawUnit
+            }
+            var effectivePrice = transaction.unitPrice
+            if (isRupiahOrNumeric && effectivePrice <= 0.0) {
+                val extracted = rawUnit.replace("[^0-9.]".toRegex(), "").toDoubleOrNull() ?: 0.0
+                if (extracted > 0.0) effectivePrice = extracted
+            }
+            if (effectivePrice <= 0.0) {
+                val vol = if (transaction.volume > 0.0) transaction.volume else 1.0
+                effectivePrice = transaction.amount / vol
+            }
+            val sanitizedTx = transaction.copy(
+                unitName = effectiveUnit,
+                unitPrice = effectivePrice
+            )
+
+            repository.updateTransaction(sanitizedTx)
             _eventFlow.emit(UiEvent.ShowToast("Transaksi berhasil diperbarui"))
             triggerAutoSyncIfConfigured()
         }
@@ -790,10 +875,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val url = googleSheetsUrl.value.trim()
                 if (url.isNotBlank() && !url.contains("docs.google.com/spreadsheets")) {
                     val repo = bkuSyncRepository as? GoogleSheetsSyncRepository
-                    val fetchResult = repo?.fetchDetailedFromGoogleSheets(url)
+                    val secretSources = customFundSources.value.filter { it.isSecret }.map { it.name }.toSet()
+                    val fetchResult = repo?.fetchDetailedFromGoogleSheets(url, secretSources)
                     val sources = fetchResult?.getOrNull()?.fundSources ?: emptyList()
                     if (sources.isNotEmpty()) {
-                        mergeCustomFundSources(sources)
+                        syncFundSourcesFromSheets(sources)
                     }
                 }
             } catch (ignored: Exception) {}
@@ -897,17 +983,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val repo = bkuSyncRepository as? GoogleSheetsSyncRepository
+            val secretSources = customFundSources.value.filter { it.isSecret }.map { it.name }.toSet()
 
-            // Langkah 1: Tarik data terbaru dari Google Sheets terlebih dahulu agar pengeluaran dari perangkat lain tidak tertimpa
-            val fetchResult = repo?.fetchDetailedFromGoogleSheets(url)
+            // Langkah 1: Tarik data terbaru dari Google Sheets terlebih dahulu agar pengeluaran atau penghapusan dari Google Sheets atau perangkat lain diproses
+            val fetchResult = repo?.fetchDetailedFromGoogleSheets(url, secretSources)
             val fetchedSources = fetchResult?.getOrNull()?.fundSources ?: emptyList()
             if (fetchedSources.isNotEmpty()) {
-                mergeCustomFundSources(fetchedSources)
+                syncFundSourcesFromSheets(fetchedSources)
             }
 
-            // Langkah 2: Ambil semua transaksi lokal terbaru (sudah ter-merge dengan Google Sheets)
+            // Langkah 2: Ambil semua transaksi lokal terbaru (sudah ter-merge dan tersinkronisasi dengan Google Sheets)
             val all = repository.allTransactions.first()
-            val secretSources = customFundSources.value.filter { it.isSecret }.map { it.name }.toSet()
             val nonSecretTransactions = all.filter { it.fundSource !in secretSources }
             val nonSecretFundNames = customFundSources.value.filter { !it.isSecret }.map { it.name }
 
@@ -919,7 +1005,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _eventFlow.emit(UiEvent.ShowToast("Gagal Sync Google Sheets: ${result.exceptionOrNull()?.localizedMessage}"))
                 }
             } else {
-                _eventFlow.emit(UiEvent.ShowToast("Sinkronisasi selesai. Belum ada transaksi kas publik untuk disinkronkan."))
+                val result = repo?.syncToGoogleSheets(url, emptyList(), nonSecretFundNames)
+                _eventFlow.emit(UiEvent.ShowToast("Sinkronisasi selesai. Seluruh transaksi kas publik bersih di HP dan Google Sheets."))
             }
         }
     }
@@ -960,7 +1047,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (items.isNotEmpty()) {
                     val sourcesFromRkas = items.map { it.fundSource.trim() }.filter { it.isNotBlank() }.distinct()
                     if (sourcesFromRkas.isNotEmpty()) {
-                        mergeCustomFundSources(sourcesFromRkas)
+                        syncFundSourcesFromSheets(sourcesFromRkas)
                     }
                     onSuccess(items)
                     _eventFlow.emit(UiEvent.ShowToast("Berhasil menarik ${items.size} item RKAS revisi dari Google Sheets!"))
@@ -981,24 +1068,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             val repo = bkuSyncRepository as? GoogleSheetsSyncRepository
-            val detailedResult = repo?.fetchDetailedFromGoogleSheets(url)
+            val secretSources = customFundSources.value.filter { it.isSecret }.map { it.name }.toSet()
+            val detailedResult = repo?.fetchDetailedFromGoogleSheets(url, secretSources)
             if (detailedResult?.isSuccess == true) {
                 val syncData = detailedResult.getOrNull()
                 val txCount = syncData?.transactions?.size ?: 0
                 val fetchedSources = syncData?.fundSources ?: emptyList()
 
                 if (fetchedSources.isNotEmpty()) {
-                    mergeCustomFundSources(fetchedSources)
+                    syncFundSourcesFromSheets(fetchedSources)
                 }
 
-                _eventFlow.emit(UiEvent.ShowToast("Berhasil mengunduh $txCount transaksi & ${customFundSources.value.size} Pos Sumber Dana dari Google Sheets"))
+                _eventFlow.emit(UiEvent.ShowToast("Berhasil sinkronisasi: $txCount transaksi & ${customFundSources.value.size} Judul Kas dari Google Sheets"))
             } else {
                 val fallbackResult = bkuSyncRepository?.fetchFromGoogleSheets(url)
                 if (fallbackResult?.isSuccess == true) {
                     val list = fallbackResult.getOrNull() ?: emptyList()
                     val sources = list.map { it.fundSource.trim() }.filter { it.isNotBlank() }.distinct()
                     if (sources.isNotEmpty()) {
-                        mergeCustomFundSources(sources)
+                        syncFundSourcesFromSheets(sources)
                     }
                     _eventFlow.emit(UiEvent.ShowToast("Berhasil mengunduh ${list.size} transaksi dari Google Sheets"))
                 } else {

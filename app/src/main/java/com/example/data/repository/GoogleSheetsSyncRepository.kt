@@ -102,12 +102,19 @@ function doPost(e) {
           }
           totalPagu += jlh;
 
+          var rawSatRkas = String(it.satuan || '').trim();
+          if (tarif <= 0 && isRupiahOrNumeric(rawSatRkas)) {
+            var exTarif = parseNumberVal(rawSatRkas);
+            if (exTarif > 0) tarif = exTarif;
+          }
+          var satRkas = sanitizeUnitString(rawSatRkas, false);
+
           rows.push([
             idx + 1,
             it.id || (idx + 1),
             it.uraian || '',
             it.volume || '1',
-            it.satuan || 'buah',
+            satRkas,
             tarif,
             jlh,
             src
@@ -116,6 +123,9 @@ function doPost(e) {
 
         if (rows.length > 0) {
           rSheet.getRange(2, 1, rows.length, headerTitles.length).setValues(rows);
+          // Kolom 5: Satuan (Teks murni @: buah, lusin, siswa, rim, dll)
+          rSheet.getRange(2, 5, rows.length, 1).setNumberFormat("@");
+          // Kolom 6 & 7: Tarif Satuan (Rp) & Jumlah Pagu (Rp) format Angka Rupiah
           rSheet.getRange(2, 6, rows.length, 2).setNumberFormat("#,##0");
 
           var totalRow = ["", "", "TOTAL PAGU ANGGARAN", "", "", "", totalPagu, src];
@@ -137,11 +147,38 @@ function doPost(e) {
     // 2. SINKRONISASI BKU / TRANSAKSI
     var transactions = contents.transactions || [];
 
+    var bkuHeaders = [
+      "No",
+      "No ID Transaksi",
+      "Tanggal",
+      "Sumber Dana",
+      "Uraian Transaksi",
+      "Volume",
+      "Satuan",
+      "Harga Satuan (Rp)",
+      "Pemasukan (Rp)",
+      "Pengeluaran (Rp)",
+      "Saldo Kas (Rp)",
+      "Status Verifikasi",
+      "Pencatat",
+      "Catatan"
+    ];
+
     if (transactions.length === 0) {
+      var allFundSourcesToClear = (contents.fundSources && contents.fundSources.length > 0) ? contents.fundSources : getAllFundSources(ss);
+      allFundSourcesToClear.forEach(function(src) {
+        var sheetName = 'BKU_' + src.replace(/[\/\\\?\*\[\]]/g, '_').trim();
+        var bkuSheet = ss.getSheetByName(sheetName);
+        if (bkuSheet) {
+          bkuSheet.clear();
+          bkuSheet.appendRow(bkuHeaders);
+          bkuSheet.getRange(1, 1, 1, bkuHeaders.length).setFontWeight("bold").setBackground("#1E40AF").setFontColor("#FFFFFF");
+        }
+      });
       return ContentService.createTextOutput(JSON.stringify({
         status: "SUCCESS",
         count: 0,
-        message: "Data transaksi lokal kosong."
+        message: "Data transaksi telah dibersihkan."
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -203,8 +240,17 @@ function doPost(e) {
         runningBalance = runningBalance + inc - exp;
 
         var vol = parseNumberVal(tx.volume) || 1;
-        var sat = String(tx.unitName || tx.satuan || (isIncome ? 'transaksi' : 'buah')).trim();
+        var rawSat = String(tx.unitName || tx.satuan || '').trim();
         var uPrice = parseNumberVal(tx.unitPrice);
+
+        // Jika kolom Satuan tidak sengaja terisi angka atau rupiah, pindahkan ke uPrice jika uPrice belum ada
+        if (uPrice <= 0 && isRupiahOrNumeric(rawSat)) {
+          var extractedPrice = parseNumberVal(rawSat);
+          if (extractedPrice > 0) uPrice = extractedPrice;
+        }
+
+        // Satuan wajib berupa unit fisik (buah, lusin, siswa, rim, dll), BUKAN rupiah!
+        var sat = sanitizeUnitString(rawSat, isIncome);
         if (uPrice <= 0) {
           uPrice = vol > 0 ? (rawAmount / vol) : rawAmount;
         }
@@ -241,6 +287,11 @@ function doPost(e) {
 
       if (sRows.length > 0) {
         bkuSheet.getRange(2, 1, sRows.length, bkuHeaders.length).setValues(sRows);
+        // Kolom 6: Volume (angka / desimal)
+        bkuSheet.getRange(2, 6, sRows.length, 1).setNumberFormat("#,##0.##");
+        // Kolom 7: Satuan (Teks murni: buah, lusin, siswa, rim, dll - BUKAN rupiah)
+        bkuSheet.getRange(2, 7, sRows.length, 1).setNumberFormat("@");
+        // Kolom 8-11: Harga Satuan (Rp), Pemasukan (Rp), Pengeluaran (Rp), Saldo Kas (Rp) -> Format Angka Rupiah
         bkuSheet.getRange(2, 8, sRows.length, 4).setNumberFormat("#,##0");
 
         var totalRow = [
@@ -326,32 +377,64 @@ function saveCustomFundSources(ss, sources) {
 
 function getAllFundSources(ss) {
   var sources = [];
-  try {
-    var cfgSheet = ss.getSheetByName('_CONFIG_POS_DANA');
-    if (cfgSheet) {
-      var cfgData = cfgSheet.getDataRange().getValues();
-      for (var k = 1; k < cfgData.length; k++) {
-        var v = String(cfgData[k][0] || '').trim();
-        if (v && sources.indexOf(v) === -1) sources.push(v);
-      }
-    }
-  } catch (e) {}
-
-  ss.getSheets().forEach(function(s) {
-    var sName = s.getName();
+  var allSheets = ss.getSheets();
+  var bkuSheetNames = {};
+  var rkasSheetNames = {};
+  
+  allSheets.forEach(function(s) {
+    var sName = s.getName().trim();
     if (sName.indexOf('BKU_') === 0 && sName !== 'BKU_Semua' && sName !== 'SEMUA BKU') {
       var n = sName.replace('BKU_', '').trim();
-      if (n && sources.indexOf(n) === -1) sources.push(n);
-    }
-    if (sName.indexOf('RKAS_') === 0 && sName !== 'RKAS_Semua') {
-      var n = sName.replace('RKAS_', '').trim();
-      if (n && sources.indexOf(n) === -1) sources.push(n);
+      if (n) {
+        bkuSheetNames[n] = true;
+        if (sources.indexOf(n) === -1) sources.push(n);
+      }
+    } else if (sName.indexOf('RKAS_') === 0 && sName !== 'RKAS_Semua') {
+      var n2 = sName.replace('RKAS_', '').trim();
+      if (n2) {
+        rkasSheetNames[n2] = true;
+      }
     }
   });
 
-  if (sources.length === 0) {
-    sources = ["BOS Reguler", "BOS Kinerja", "BOS Afirmasi", "SiLPA BOS", "Infaq / Komite", "BOS Daerah"];
+  // Jika ada tab RKAS yang belum ada tab BKU-nya, tambahkan
+  for (var rkasSrc in rkasSheetNames) {
+    if (sources.indexOf(rkasSrc) === -1) {
+      sources.push(rkasSrc);
+    }
   }
+
+  // Jika belum ada tab BKU maupun RKAS (misal spreadsheet baru dibuat), periksa _CONFIG_POS_DANA
+  if (sources.length === 0) {
+    try {
+      var cfgSheet = ss.getSheetByName('_CONFIG_POS_DANA');
+      if (cfgSheet) {
+        var cfgData = cfgSheet.getDataRange().getValues();
+        for (var k = 1; k < cfgData.length; k++) {
+          var v = String(cfgData[k][0] || '').trim();
+          if (v && sources.indexOf(v) === -1) sources.push(v);
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (sources.length === 0) {
+    sources = ["BOS Reguler", "BOS Kinerja", "Dana Komite", "Hibah / Lainnya"];
+  }
+
+  // Sinkronkan kembali _CONFIG_POS_DANA dengan tab yang aktif agar tidak ada tab hantu yang tertinggal
+  try {
+    var cfgSheet2 = ss.getSheetByName('_CONFIG_POS_DANA');
+    if (cfgSheet2 && ss.getSheets().length > 1) {
+      cfgSheet2.clear();
+      cfgSheet2.appendRow(["Pos Sumber Dana"]);
+      sources.forEach(function(s) {
+        cfgSheet2.appendRow([s]);
+      });
+      cfgSheet2.hideSheet();
+    }
+  } catch (e) {}
+
   return sources;
 }
 
@@ -412,7 +495,10 @@ function doGet(e) {
             var h = String(rowCells[c] || '').trim().toLowerCase();
             if (!h) continue;
 
-            if (h === 'satuan' || h === 'sat' || h === 'unit' || h.indexOf('satuan') !== -1 || h.indexOf('unit') !== -1) {
+            if (h.indexOf('tarif') !== -1 || h.indexOf('harga') !== -1 || h.indexOf('biaya') !== -1 || h.indexOf('price') !== -1) {
+              tempCols.tarif = c;
+              score += 4;
+            } else if (h === 'satuan' || h === 'sat' || h === 'unit' || (h.indexOf('satuan') !== -1 && h.indexOf('tarif') === -1 && h.indexOf('harga') === -1)) {
               tempCols.sat = c;
               score += 4;
             } else if (h.indexOf('uraian') !== -1 || h.indexOf('kegiatan') !== -1 || h.indexOf('nama barang') !== -1 || h.indexOf('rincian') !== -1 || h.indexOf('deskripsi') !== -1 || h.indexOf('barang') !== -1) {
@@ -426,9 +512,6 @@ function doGet(e) {
               score += 2;
             } else if (h.indexOf('vol') !== -1 || h.indexOf('kuantitas') !== -1 || h.indexOf('qty') !== -1 || h.indexOf('banyak') !== -1) {
               tempCols.vol = c;
-              score += 2;
-            } else if (h.indexOf('tarif') !== -1 || h.indexOf('harga') !== -1 || h.indexOf('biaya') !== -1) {
-              tempCols.tarif = c;
               score += 2;
             } else if (h.indexOf('jumlah') !== -1 || h.indexOf('total') !== -1 || h.indexOf('pagu') !== -1 || h.indexOf('anggaran') !== -1) {
               tempCols.jml = c;
@@ -530,14 +613,12 @@ function doGet(e) {
           var progVal = detectedCols.prog !== -1 && row[detectedCols.prog] !== undefined 
             ? String(row[detectedCols.prog]).trim() : '';
 
-          var satVal = 'buah';
-          if (detectedCols.sat !== -1 && row[detectedCols.sat] !== undefined) {
-            var rawSat = String(row[detectedCols.sat]).trim();
-            // Pastikan satuan bukan angka nominal atau sama dengan kolom tarif/volume
-            if (rawSat !== '' && isNaN(rawSat) && rawSat !== volStr) {
-              satVal = rawSat;
-            }
+          var rawSatRkas = (detectedCols.sat !== -1 && row[detectedCols.sat] !== undefined) ? String(row[detectedCols.sat]).trim() : '';
+          if (isRupiahOrNumeric(rawSatRkas)) {
+            if (tHarga <= 0) tHarga = parseNumberVal(rawSatRkas);
+            rawSatRkas = 'buah';
           }
+          var satVal = sanitizeUnitString(rawSatRkas, false);
 
           items.push({
             id: rowId,
@@ -570,67 +651,166 @@ function doGet(e) {
     }
 
     var bkuSheets = ss.getSheets().filter(function(s) {
-      var n = s.getName();
+      var n = s.getName().trim();
       return n.indexOf('BKU_') === 0 && n !== 'BKU_Semua' && n !== 'SEMUA BKU';
     });
+
+    if (bkuSheets.length === 0) {
+      bkuSheets = ss.getSheets().filter(function(s) {
+        var nLower = s.getName().trim().toLowerCase();
+        return nLower !== '_config_pos_dana' && nLower.indexOf('rkas') === -1;
+      });
+    }
 
     var txList = [];
     bkuSheets.forEach(function(sheet) {
       var data = sheet.getDataRange().getValues();
-      if (data.length <= 1) return;
+      if (!data || data.length <= 1) return;
 
-      var headerRow = data[0] || [];
+      // Cari baris header yang tepat dengan memindai 15 baris pertama
+      var bestHeaderRowIdx = 0;
+      var maxScore = -1;
       var colMap = {
-        id: 1, date: 2, fund: 3, title: 4, vol: -1, sat: -1, price: -1, inc: -1, exp: -1, balance: -1, status: -1, role: -1, notes: -1
+        id: -1, date: -1, fund: -1, title: -1, vol: -1, sat: -1, price: -1, inc: -1, exp: -1, balance: -1, status: -1, role: -1, notes: -1
       };
 
-      for (var c = 0; c < headerRow.length; c++) {
-        var h = String(headerRow[c] || '').trim().toLowerCase();
-        if (h.indexOf('id') !== -1) colMap.id = c;
-        else if (h.indexOf('tanggal') !== -1 || h.indexOf('tgl') !== -1) colMap.date = c;
-        else if (h.indexOf('sumber') !== -1 || h.indexOf('dana') !== -1) colMap.fund = c;
-        else if (h.indexOf('uraian') !== -1 || h.indexOf('transaksi') !== -1 || h.indexOf('keterangan') !== -1) colMap.title = c;
-        else if (h.indexOf('vol') !== -1 || h.indexOf('banyak') !== -1 || h.indexOf('qty') !== -1) colMap.vol = c;
-        else if (h.indexOf('satuan') !== -1 || h.indexOf('sat') !== -1 || h.indexOf('unit') !== -1) colMap.sat = c;
-        else if (h.indexOf('harga') !== -1 || h.indexOf('tarif') !== -1) colMap.price = c;
-        else if (h.indexOf('masuk') !== -1 || h.indexOf('terima') !== -1 || h.indexOf('penerimaan') !== -1) colMap.inc = c;
-        else if (h.indexOf('keluar') !== -1 || h.indexOf('pengeluaran') !== -1 || h.indexOf('belanja') !== -1) colMap.exp = c;
-        else if (h.indexOf('status') !== -1 || h.indexOf('verifikasi') !== -1) colMap.status = c;
-        else if (h.indexOf('catatan') !== -1 || h.indexOf('bukti') !== -1 || h.indexOf('ket') !== -1) colMap.notes = c;
-        else if (h.indexOf('catat') !== -1 || h.indexOf('pencatat') !== -1 || h.indexOf('role') !== -1) colMap.role = c;
-      }
+      var scanLimit = Math.min(data.length, 15);
+      for (var r = 0; r < scanLimit; r++) {
+        var rowCells = data[r];
+        if (!rowCells || rowCells.length === 0) continue;
+        var score = 0;
+        var tempCols = {
+          id: -1, date: -1, fund: -1, title: -1, vol: -1, sat: -1, price: -1, inc: -1, exp: -1, balance: -1, status: -1, role: -1, notes: -1
+        };
 
-      if (colMap.inc === -1 && colMap.exp === -1) {
-        if (colMap.vol !== -1) {
-          colMap.inc = 8;
-          colMap.exp = 9;
-          colMap.status = 11;
-          colMap.role = 12;
-          colMap.notes = 13;
-        } else {
-          colMap.inc = 5;
-          colMap.exp = 6;
-          colMap.status = 8;
-          colMap.role = 9;
-          colMap.notes = 10;
+        for (var c = 0; c < rowCells.length; c++) {
+          var h = String(rowCells[c] || '').trim().toLowerCase();
+          if (!h) continue;
+
+          if (h.indexOf('uraian') !== -1 || h.indexOf('keterangan') !== -1 || h.indexOf('deskripsi') !== -1 || 
+              h.indexOf('keperluan') !== -1 || h.indexOf('nama barang') !== -1 || h.indexOf('transaksi') !== -1 || 
+              h.indexOf('rincian') !== -1 || h.indexOf('belanja') !== -1) {
+            tempCols.title = c;
+            score += 4;
+          } else if (h.indexOf('masuk') !== -1 || h.indexOf('terima') !== -1 || h.indexOf('penerimaan') !== -1 || 
+                     h.indexOf('pemasukan') !== -1 || h.indexOf('debet') !== -1 || h.indexOf('debit') !== -1) {
+            tempCols.inc = c;
+            score += 3;
+          } else if (h.indexOf('keluar') !== -1 || h.indexOf('pengeluaran') !== -1 || h.indexOf('kredit') !== -1) {
+            tempCols.exp = c;
+            score += 3;
+          } else if (h.indexOf('tanggal') !== -1 || h.indexOf('tgl') !== -1 || h.indexOf('waktu') !== -1) {
+            tempCols.date = c;
+            score += 2;
+          } else if (h.indexOf('sumber') !== -1 || h.indexOf('dana') !== -1 || h.indexOf('pos') !== -1) {
+            tempCols.fund = c;
+            score += 2;
+          } else if (h === 'id' || h.indexOf('no id') !== -1 || h.indexOf('id transaksi') !== -1 || h === 'kode') {
+            tempCols.id = c;
+            score += 2;
+          } else if (h.indexOf('vol') !== -1 || h.indexOf('qty') !== -1 || h.indexOf('banyak') !== -1 || h.indexOf('kuantitas') !== -1) {
+            tempCols.vol = c;
+            score += 2;
+          } else if (h.indexOf('harga') !== -1 || h.indexOf('tarif') !== -1 || h.indexOf('price') !== -1 || h.indexOf('biaya') !== -1) {
+            // HARGA SATUAN (RP) HARUS DIDETEKSI SEBELUM SATUAN!
+            tempCols.price = c;
+            score += 3;
+          } else if (h === 'satuan' || h === 'sat' || h === 'unit' || (h.indexOf('satuan') !== -1 && h.indexOf('harga') === -1 && h.indexOf('tarif') === -1)) {
+            // SATUAN HANYA BILA BUKAN HARGA SATUAN
+            tempCols.sat = c;
+            score += 2;
+          } else if (h.indexOf('saldo') !== -1) {
+            tempCols.balance = c;
+            score += 1;
+          } else if (h.indexOf('status') !== -1 || h.indexOf('verifikasi') !== -1 || h.indexOf('approval') !== -1) {
+            tempCols.status = c;
+            score += 1;
+          } else if (h.indexOf('catatan') !== -1 || h.indexOf('bukti') !== -1 || h.indexOf('ket') !== -1) {
+            tempCols.notes = c;
+            score += 1;
+          } else if (h.indexOf('catat') !== -1 || h.indexOf('pencatat') !== -1 || h.indexOf('role') !== -1) {
+            tempCols.role = c;
+            score += 1;
+          }
+        }
+
+        if (score > maxScore) {
+          maxScore = score;
+          bestHeaderRowIdx = r;
+          for (var k in tempCols) {
+            if (tempCols[k] !== -1) colMap[k] = tempCols[k];
+          }
         }
       }
 
-      for (var i = 1; i < data.length; i++) {
+      // Default fallback jika tidak terdeteksi dari header
+      if (colMap.inc === -1 && colMap.exp === -1) {
+        colMap.inc = 8;
+        colMap.exp = 9;
+      }
+      if (colMap.title === -1) {
+        colMap.title = 4;
+      }
+
+      var startRow = (maxScore >= 2) ? bestHeaderRowIdx + 1 : 1;
+
+      for (var i = startRow; i < data.length; i++) {
         var row = data[i];
-        var rowTitle = colMap.title !== -1 && row[colMap.title] ? String(row[colMap.title]).trim() : '';
-        if (!row[colMap.id] && !rowTitle) continue;
-        if (rowTitle.toUpperCase().indexOf('TOTAL') === 0 || String(row[colMap.fund] || '').toUpperCase().indexOf('TOTAL') === 0) continue;
+        if (!row || row.length === 0) continue;
+
+        var rowTitle = (colMap.title !== -1 && row[colMap.title] !== undefined) ? String(row[colMap.title]).trim() : '';
+
+        // Jika kolom uraian kosong, cari teks deskripsi di kolom lain baris ini
+        if (!rowTitle) {
+          for (var colIdx = 0; colIdx < row.length; colIdx++) {
+            if (colIdx !== colMap.date && colIdx !== colMap.inc && colIdx !== colMap.exp && 
+                colIdx !== colMap.vol && colIdx !== colMap.price && colIdx !== colMap.id && 
+                colIdx !== colMap.balance) {
+              var cellTxt = String(row[colIdx] || '').trim();
+              if (cellTxt.length > 2 && isNaN(cellTxt)) {
+                rowTitle = cellTxt;
+                break;
+              }
+            }
+          }
+        }
 
         var pIncome = colMap.inc !== -1 ? parseNumberVal(row[colMap.inc]) : 0;
         var pExpense = colMap.exp !== -1 ? parseNumberVal(row[colMap.exp]) : 0;
+
+        if (!rowTitle && pIncome === 0 && pExpense === 0) continue;
+
+        var tUpper = rowTitle.toUpperCase();
+        if (tUpper.indexOf('TOTAL') === 0 || tUpper.indexOf('JUMLAH TOTAL') === 0 || 
+            tUpper.indexOf('SALDO AKHIR') === 0 || tUpper.indexOf('REKAPITULASI') === 0) {
+          continue;
+        }
+
         var tAmount = pIncome > 0 ? pIncome : pExpense;
         var tType = pIncome > 0 ? 'PEMASUKAN' : 'PENGELUARAN';
-        var fSrc = (colMap.fund !== -1 && row[colMap.fund]) ? String(row[colMap.fund]).trim() : (sheet.getName().replace('BKU_', '') || 'BOS Reguler');
+
+        if (!rowTitle) {
+          rowTitle = (tType === 'PEMASUKAN') ? 'Penerimaan Kas' : 'Pengeluaran Kas';
+        }
+
+        var fSrc = (colMap.fund !== -1 && row[colMap.fund] && String(row[colMap.fund]).trim() !== '') 
+          ? String(row[colMap.fund]).trim() 
+          : (sheet.getName().replace(/^BKU[_\s-]*/i, '').trim() || 'BOS Reguler');
+        if (!fSrc || fSrc === 'Semua') fSrc = 'BOS Reguler';
         
         var vVal = (colMap.vol !== -1 && row[colMap.vol] !== undefined && String(row[colMap.vol]).trim() !== '') ? parseNumberVal(row[colMap.vol]) : 1;
-        var sVal = (colMap.sat !== -1 && row[colMap.sat] !== undefined && String(row[colMap.sat]).trim() !== '') ? String(row[colMap.sat]).trim() : (tType === 'PEMASUKAN' ? 'transaksi' : 'buah');
+        var rawSVal = (colMap.sat !== -1 && row[colMap.sat] !== undefined) ? String(row[colMap.sat]).trim() : '';
         var pVal = (colMap.price !== -1 && row[colMap.price] !== undefined) ? parseNumberVal(row[colMap.price]) : 0;
+
+        // Pastikan kolom Satuan berisi nama satuan (buah, lusin, siswa, dll), bukan nominal rupiah!
+        if (isRupiahOrNumeric(rawSVal)) {
+          if (pVal <= 0) {
+            pVal = parseNumberVal(rawSVal);
+          }
+          rawSVal = (tType === 'PEMASUKAN') ? 'transaksi' : 'buah';
+        }
+        var sVal = sanitizeUnitString(rawSVal, tType === 'PEMASUKAN');
+
         if (pVal <= 0 && vVal > 0) {
           pVal = tAmount / vVal;
         }
@@ -646,9 +826,17 @@ function doGet(e) {
           if (!isNaN(parsed)) dTime = parsed;
         }
 
+        var rowIdVal = (colMap.id !== -1 && row[colMap.id] !== undefined) ? parseInt(row[colMap.id]) : 0;
+        if (isNaN(rowIdVal) || rowIdVal <= 0) {
+          rowIdVal = i;
+        }
+
+        var rowNotes = (colMap.notes !== -1 && row[colMap.notes]) ? String(row[colMap.notes]).trim() : '';
+
         txList.push({
-          id: parseInt(row[colMap.id]) || i,
+          id: rowIdVal,
           title: rowTitle,
+          uraian: rowTitle,
           amount: tAmount,
           type: tType,
           fundSource: fSrc,
@@ -657,7 +845,7 @@ function doGet(e) {
           unitName: sVal || 'buah',
           unitPrice: pVal || tAmount,
           date: dTime,
-          notes: (colMap.notes !== -1 && row[colMap.notes]) ? String(row[colMap.notes]) : '',
+          notes: rowNotes,
           approvalStatus: (colMap.status !== -1 && row[colMap.status]) ? String(row[colMap.status]) : 'VERIFIED',
           recordedByRole: (colMap.role !== -1 && row[colMap.role]) ? String(row[colMap.role]) : 'Bendahara'
         });
@@ -677,6 +865,25 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({ status: "ERROR", message: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function isRupiahOrNumeric(val) {
+  if (val === null || val === undefined) return false;
+  var s = String(val).trim().toLowerCase();
+  if (s.indexOf('rp') === 0) return true;
+  var digits = s.replace(/[^0-9]/g, '');
+  if (digits.length > 0 && s.replace(/[0-9.,\s]/g, '').length === 0) return true;
+  return false;
+}
+
+function sanitizeUnitString(rawSat, isIncome) {
+  if (!rawSat) return isIncome ? 'transaksi' : 'buah';
+  var s = String(rawSat).trim();
+  var sLower = s.toLowerCase();
+  if (isRupiahOrNumeric(s) || sLower === 'rp' || sLower === 'rupiah' || sLower === '-' || sLower === '0' || sLower === 'null') {
+    return isIncome ? 'transaksi' : 'buah';
+  }
+  return s;
 }
 
 function parseNumberVal(val) {
@@ -772,8 +979,21 @@ function cleanupDefaultSheet(ss) {
                 val cleanNotes = tx.notes.replace(Regex("^Vol:\\s*[^•]+•\\s*", RegexOption.IGNORE_CASE), "").trim()
                 val escapedNotes = "\"${cleanNotes.replace("\"", "\"\"")}\""
                 val vol = if (tx.volume > 0) tx.volume else 1.0
-                val sat = tx.unitName.ifBlank { if (tx.type == "PEMASUKAN") "transaksi" else "buah" }
-                val uPrice = if (tx.unitPrice > 0) tx.unitPrice.toLong() else (if (vol > 0) (tx.amount / vol).toLong() else tx.amount.toLong())
+                val rawSat = tx.unitName.trim().ifBlank { if (tx.type == "PEMASUKAN") "transaksi" else "buah" }
+                val isRupiahOrNumeric = rawSat.startsWith("Rp", ignoreCase = true) || rawSat.matches(Regex("^[0-9.,\\s]+$"))
+                val sat = if (isRupiahOrNumeric) {
+                    if (tx.type == "PEMASUKAN") "transaksi" else "buah"
+                } else {
+                    rawSat
+                }
+                var uPrice = if (tx.unitPrice > 0) tx.unitPrice.toLong() else 0L
+                if (isRupiahOrNumeric && uPrice <= 0L) {
+                    val parsed = rawSat.replace("[^0-9]".toRegex(), "").toLongOrNull() ?: 0L
+                    if (parsed > 0L) uPrice = parsed
+                }
+                if (uPrice <= 0L) {
+                    uPrice = if (vol > 0) (tx.amount / vol).toLong() else tx.amount.toLong()
+                }
 
                 csvBuilder.append("${index + 1},${tx.id},\"$dateStr\",\"${tx.fundSource}\",\"${tx.type}\",$escapedTitle,$vol,\"$sat\",$uPrice,$income,$expense,\"${tx.approvalStatus}\",\"${tx.recordedByRole}\",$escapedNotes\n")
             }
@@ -1158,7 +1378,10 @@ function cleanupDefaultSheet(ss) {
         }
     }
 
-    suspend fun fetchDetailedFromGoogleSheets(webAppUrl: String): Result<SyncFetchResult> = withContext(Dispatchers.IO) {
+    suspend fun fetchDetailedFromGoogleSheets(
+        webAppUrl: String,
+        secretFundSources: Set<String> = emptySet()
+    ): Result<SyncFetchResult> = withContext(Dispatchers.IO) {
         if (webAppUrl.isBlank()) {
             val err = "URL Google Apps Script Web App belum diisi."
             _syncState.value = SyncState.Error(err)
@@ -1189,13 +1412,32 @@ function cleanupDefaultSheet(ss) {
 
                     if (trimmed.startsWith("{")) {
                         val jsonObj = org.json.JSONObject(trimmed)
+                        if (jsonObj.optString("status") == "ERROR") {
+                            val errMsg = jsonObj.optString("message", "Error dari Google Sheets Apps Script")
+                            _syncState.value = SyncState.Error(errMsg)
+                            return@withContext Result.failure(Exception(errMsg))
+                        }
+
                         val txArr = jsonObj.optJSONArray("transactions") ?: org.json.JSONArray()
                         for (i in 0 until txArr.length()) {
                             val it = txArr.getJSONObject(i)
                             val vol = it.optDouble("volume", 1.0)
-                            val sat = it.optString("unitName", it.optString("satuan", "buah"))
-                            val price = it.optDouble("unitPrice", 0.0)
+                            val rawSat = it.optString("unitName", it.optString("satuan", "buah")).trim()
+                            var price = it.optDouble("unitPrice", 0.0)
                             val amt = it.optDouble("amount", 0.0)
+                            val isIncome = it.optString("type") == "PEMASUKAN"
+
+                            val isRupiahOrNum = rawSat.startsWith("Rp", ignoreCase = true) || rawSat.matches(Regex("^[0-9.,\\s]+$"))
+                            if (isRupiahOrNum && price <= 0.0) {
+                                val extracted = rawSat.replace("[^0-9.]".toRegex(), "").toDoubleOrNull() ?: 0.0
+                                if (extracted > 0.0) price = extracted
+                            }
+                            val cleanSat = if (isRupiahOrNum || rawSat.isBlank()) {
+                                if (isIncome) "transaksi" else "buah"
+                            } else {
+                                rawSat
+                            }
+
                             val rawStatus = it.optString("approvalStatus", "VERIFIED")
                             val cleanStatus = when {
                                 rawStatus.contains("PENDING", ignoreCase = true) || rawStatus.contains("MENUNGGU", ignoreCase = true) -> "PENDING_APPROVAL"
@@ -1205,16 +1447,22 @@ function cleanupDefaultSheet(ss) {
                             val rawRole = it.optString("recordedByRole", "Bendahara")
                             val cleanRole = if (rawRole.contains("kepala", ignoreCase = true) || rawRole.contains("kepsek", ignoreCase = true)) "Kepala Sekolah" else "Bendahara"
 
+                            val rawTitle = it.optString("title", "").ifBlank {
+                                it.optString("uraian", "").ifBlank {
+                                    it.optString("keterangan", if (amt > 0) (if (it.optString("type") == "PEMASUKAN") "Penerimaan Kas" else "Pengeluaran Kas") else "")
+                                }
+                            }
+
                             fetchedList.add(
                                 TransactionEntity(
                                     id = it.optInt("id", 0),
-                                    title = it.optString("title", ""),
+                                    title = rawTitle.ifBlank { if (it.optString("type") == "PEMASUKAN") "Penerimaan Kas" else "Pengeluaran Kas" },
                                     amount = amt,
                                     type = it.optString("type", "PENGELUARAN"),
                                     fundSource = it.optString("fundSource", "BOS Reguler"),
                                     category = it.optString("category", "Umum"),
                                     volume = vol,
-                                    unitName = sat,
+                                    unitName = cleanSat,
                                     unitPrice = if (price > 0) price else (if (vol > 0) amt / vol else amt),
                                     date = it.optLong("date", System.currentTimeMillis()),
                                     notes = it.optString("notes", ""),
@@ -1245,6 +1493,7 @@ function cleanupDefaultSheet(ss) {
                     // Sinkronkan dan gabungkan transaksi dari Google Sheets dengan aman ke database lokal
                     val localTransactions = transactionDao.getAllTransactionsSync()
                     val localMapById = localTransactions.associateBy { it.id }
+                    val matchedLocalIds = mutableSetOf<Int>()
 
                     fetchedList.forEach { tx ->
                         val src = tx.fundSource.trim()
@@ -1265,8 +1514,13 @@ function cleanupDefaultSheet(ss) {
 
                         val targetTx = when {
                             matchByContent != null -> {
-                                // Transaksi sudah ada, perbarui status verifikasi/approval dari Google Sheets
+                                matchedLocalIds.add(matchByContent.id)
+                                // Transaksi sudah ada, perbarui judul, status, volume, harga satuan, dan catatan dari Google Sheets
                                 matchByContent.copy(
+                                    title = if (tx.title.isNotBlank()) tx.title else matchByContent.title,
+                                    amount = tx.amount,
+                                    type = tx.type,
+                                    fundSource = tx.fundSource,
                                     approvalStatus = tx.approvalStatus,
                                     volume = tx.volume,
                                     unitName = tx.unitName,
@@ -1276,9 +1530,14 @@ function cleanupDefaultSheet(ss) {
                                 )
                             }
                             matchById != null -> {
-                                // ID sama: jika judul atau nominal sama maka update, jika tidak berikan id = 0 agar autoincrement
+                                matchedLocalIds.add(matchById.id)
+                                // ID sama: perbarui judul, nominal, volume, harga satuan, dan catatan dari Google Sheets
                                 if (matchById.title.trim().equals(tx.title.trim(), ignoreCase = true) || matchById.amount == tx.amount) {
                                     matchById.copy(
+                                        title = if (tx.title.isNotBlank()) tx.title else matchById.title,
+                                        amount = tx.amount,
+                                        type = tx.type,
+                                        fundSource = tx.fundSource,
                                         approvalStatus = tx.approvalStatus,
                                         volume = tx.volume,
                                         unitName = tx.unitName,
@@ -1291,15 +1550,53 @@ function cleanupDefaultSheet(ss) {
                                 }
                             }
                             else -> {
-                                // Transaksi baru dari perangkat lain (misal pengeluaran bendahara)
+                                // Transaksi baru dari Google Sheets / perangkat lain
                                 tx
                             }
                         }
 
-                        transactionDao.insertTransaction(targetTx)
+                        val insertedId = transactionDao.insertTransaction(targetTx)
+                        if (targetTx.id > 0) {
+                            matchedLocalIds.add(targetTx.id)
+                        } else if (insertedId > 0) {
+                            matchedLocalIds.add(insertedId.toInt())
+                        }
                     }
 
-                    val msg = "Berhasil mengunduh ${fetchedList.size} transaksi & ${fundSourcesList.size} Pos Sumber Dana dari Google Sheets"
+                    // Sinkronkan penghapusan: Jika suatu transaksi dihapus di Google Sheets, hapus juga dari HP
+                    val now = System.currentTimeMillis()
+                    val localToDelete = localTransactions.filter { localTx ->
+                        // Pos rahasia milik Kepala Sekolah tidak pernah dihapus oleh sync Google Sheets
+                        if (localTx.fundSource in secretFundSources) return@filter false
+
+                        // Jika transaksi cocok dengan data Google Sheets yang aktif, jangan hapus
+                        if (localTx.id in matchedLocalIds) return@filter false
+
+                        // Cek ulang apakah ada kecocokan konten dengan fetchedList
+                        val hasMatchInFetched = fetchedList.any { fetched ->
+                            (fetched.id > 0 && fetched.id == localTx.id) ||
+                            (localTx.title.trim().equals(fetched.title.trim(), ignoreCase = true) &&
+                             localTx.amount == fetched.amount &&
+                             localTx.fundSource.trim().equals(fetched.fundSource.trim(), ignoreCase = true) &&
+                             localTx.type == fetched.type &&
+                             kotlin.math.abs(localTx.date - fetched.date) < 86400000L)
+                        }
+                        if (hasMatchInFetched) return@filter false
+
+                        // Beri toleransi 15 detik untuk transaksi yang baru dibuat secara lokal di HP ini
+                        val isRecentlyCreated = (now - localTx.createdAt) < 15_000L
+                        if (isRecentlyCreated) return@filter false
+
+                        // Transaksi ini telah dihapus di Google Sheets
+                        true
+                    }
+
+                    localToDelete.forEach { txToDelete ->
+                        transactionDao.deleteTransaction(txToDelete)
+                    }
+
+                    val deletedMsg = if (localToDelete.isNotEmpty()) ", ${localToDelete.size} transaksi dihapus" else ""
+                    val msg = "Sinkronisasi Google Sheets berhasil: ${fetchedList.size} transaksi aktif$deletedMsg & ${fundSourcesList.size} Pos Kas"
                     _syncState.value = SyncState.Success(msg)
                     Result.success(SyncFetchResult(fetchedList, fundSourcesList))
                 }

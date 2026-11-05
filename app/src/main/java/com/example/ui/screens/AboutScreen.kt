@@ -316,13 +316,13 @@ private fun getAppVersionName(context: Context): String {
             packageManager.getPackageInfo(
                 packageName,
                 PackageManager.PackageInfoFlags.of(0)
-            ).versionName ?: "6.1"
+            ).versionName ?: "6.5"
         } else {
             @Suppress("DEPRECATION")
-            packageManager.getPackageInfo(packageName, 0).versionName ?: "6.1"
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "6.5"
         }
     } catch (e: Exception) {
-        "6.1"
+        "6.5"
     }
 }
 
