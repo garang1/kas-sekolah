@@ -42,6 +42,7 @@ import com.example.data.model.TransactionEntity
 import com.example.network.ParsedTransactionResult
 import com.example.ui.components.AppLockScreen
 import com.example.ui.components.ReceiptViewerModal
+import com.example.ui.components.VoiceTransactionDialog
 import com.example.ui.screens.ApprovalScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.ReportScreen
@@ -125,6 +126,8 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
     var activeTab by remember { mutableStateOf(0) } // 0: Dashboard, 1: Entry, 2: Approval, 3: Report
     var showAccountDialog by remember { mutableStateOf(false) }
     var showGoogleSheetsDialog by remember { mutableStateOf(false) }
+    var showVoiceInputDialog by remember { mutableStateOf(false) }
+    var pendingVoiceResult by remember { mutableStateOf<ParsedTransactionResult?>(null) }
     var selectedReceiptTx by remember { mutableStateOf<TransactionEntity?>(null) }
 
     // Saldo Tidak Cukup Warning Alert Dialog
@@ -263,17 +266,22 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                     onNavigateToApproval = { activeTab = 2 },
                     onViewReceipt = { tx -> selectedReceiptTx = tx },
                     onEditTransaction = { tx -> viewModel.updateTransaction(tx) },
-                    onDeleteTransaction = { tx -> viewModel.deleteTransaction(tx) }
+                    onDeleteTransaction = { tx -> viewModel.deleteTransaction(tx) },
+                    onOpenVoiceInput = { showVoiceInputDialog = true }
                 )
 
                 1 -> TransactionEntryScreen(
-                    initialParsedResult = null,
+                    initialParsedResult = pendingVoiceResult,
                     userSession = userSession,
                     currentRole = currentRole,
                     fundSources = visibleFundSources,
-                    onBack = { activeTab = 0 },
+                    onBack = {
+                        pendingVoiceResult = null
+                        activeTab = 0
+                    },
                     onSubmitTransaction = { title, amount, type, fundSource, category, volume, unitName, unitPrice, notes, receiptUri, date ->
                         viewModel.submitTransaction(title, amount, type, fundSource, category, volume, unitName, unitPrice, notes, receiptUri, date)
+                        pendingVoiceResult = null
                         activeTab = 0
                     }
                 )
@@ -300,6 +308,7 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                     spreadsheetDocUrl = spreadsheetDocUrl,
                     onSaveGoogleSheetsUrl = { scriptUrl, docUrl -> viewModel.saveGoogleSheetsUrl(scriptUrl, docUrl) },
                     onExportCsv = { ctx, fundName -> viewModel.exportToCsv(ctx, fundName) },
+                    onExportJson = { ctx -> viewModel.exportDatabaseToJson(ctx, shareImmediately = true) },
                     onSyncAllToGoogleSheets = { viewModel.syncAllToGoogleSheets() },
                     onFetchFromGoogleSheets = { viewModel.fetchFromGoogleSheets() },
                     onDeleteAllData = { viewModel.deleteAllData() },
@@ -322,8 +331,7 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                 onLoginAccount = { role, name, pin -> viewModel.loginUserAccount(role, name, pin) },
                 onSetDeviceRoleLock = { lockMode -> viewModel.setDeviceRoleLock(lockMode) },
                 onUpdateProfile = { profile -> viewModel.updateSchoolProfile(profile) },
-                    onOpenGoogleSheetsSetup = {
-                    
+                onOpenGoogleSheetsSetup = {
                     showGoogleSheetsDialog = true
                 },
                 onSaveGoogleSheetsUrl = { scriptUrl, docUrl -> viewModel.saveGoogleSheetsUrl(scriptUrl, docUrl) },
@@ -332,6 +340,7 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                 onRenameFundSource = { old, new -> viewModel.renameFundSource(old, new) },
                 onSyncAllToGoogleSheets = { viewModel.syncAllToGoogleSheets() },
                 onFetchFromGoogleSheets = { viewModel.fetchFromGoogleSheets() },
+                onExportJsonFile = { viewModel.exportDatabaseToJson(context, shareImmediately = true) },
                 onBackupData = { uri -> viewModel.backupData(context, uri) },
                 onRestoreData = { uri -> viewModel.restoreData(context, uri) }
             )
@@ -349,6 +358,48 @@ fun BukuKasPintarApp(viewModel: MainViewModel) {
                     viewModel.saveGoogleSheetsUrl(scriptUrl, docUrl) 
                 },
                 onDismiss = { showGoogleSheetsDialog = false }
+            )
+        }
+
+        // Voice Transaction Input Modal Dialog
+        if (showVoiceInputDialog) {
+            VoiceTransactionDialog(
+                availableFundSources = visibleFundSources,
+                onDismiss = { showVoiceInputDialog = false },
+                onApplyToForm = { result ->
+                    showVoiceInputDialog = false
+                    pendingVoiceResult = result
+                    activeTab = 1
+                },
+                onDirectSave = { result ->
+                    showVoiceInputDialog = false
+                    val proofSummary = "Kwitansi: Ada | Nota: Ada"
+                    val parts = listOf(result.notes, proofSummary).filter { it.isNotBlank() }
+                    val finalNotes = parts.joinToString(" • ")
+
+                    val rawUnit = result.unitName.trim()
+                    val isIncome = result.type == "PEMASUKAN"
+                    val isRupiahOrNum = rawUnit.startsWith("Rp", ignoreCase = true) || rawUnit.matches(Regex("^[0-9.,\\s]+$"))
+                    val cleanUnit = if (isRupiahOrNum || rawUnit.isBlank()) {
+                        if (isIncome) "transaksi" else "buah"
+                    } else {
+                        rawUnit
+                    }
+
+                    viewModel.submitTransaction(
+                        result.title.trim().ifBlank { if (result.type == "PEMASUKAN") "Penerimaan Kas" else "Pengeluaran Kas" },
+                        result.amount,
+                        result.type,
+                        result.fundSource,
+                        result.category,
+                        result.volume,
+                        cleanUnit,
+                        result.unitPrice,
+                        finalNotes,
+                        proofSummary,
+                        System.currentTimeMillis()
+                    )
+                }
             )
         }
 

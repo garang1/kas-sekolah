@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingBag
@@ -38,6 +39,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import com.example.ui.components.VoiceTransactionDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -95,11 +97,21 @@ fun TransactionEntryScreen(
     var notes by remember { mutableStateOf(initialParsedResult?.notes ?: "") }
     
     // Volume & Harga Satuan input states
-    var volumeQtyText by remember { mutableStateOf("1") }
-    var unitText by remember { mutableStateOf("buah") }
+    var volumeQtyText by remember {
+        mutableStateOf(
+            if (initialParsedResult != null && initialParsedResult.volume > 0) {
+                if (initialParsedResult.volume % 1.0 == 0.0) initialParsedResult.volume.toInt().toString() else initialParsedResult.volume.toString()
+            } else {
+                "1"
+            }
+        )
+    }
+    var unitText by remember { mutableStateOf(initialParsedResult?.unitName?.takeIf { it.isNotBlank() } ?: "buah") }
     var unitPriceText by remember {
         mutableStateOf(
-            if (initialParsedResult != null && initialParsedResult.amount > 0) {
+            if (initialParsedResult != null && initialParsedResult.unitPrice > 0) {
+                initialParsedResult.unitPrice.toLong().toString()
+            } else if (initialParsedResult != null && initialParsedResult.amount > 0) {
                 initialParsedResult.amount.toLong().toString()
             } else {
                 ""
@@ -110,6 +122,31 @@ fun TransactionEntryScreen(
     var kwitansiOption by remember { mutableStateOf("Ada") }
     var notaOption by remember { mutableStateOf("Ada") }
     var selectedDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var showVoiceDialog by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(initialParsedResult) {
+        if (initialParsedResult != null) {
+            title = initialParsedResult.title
+            type = initialParsedResult.type
+            if (initialParsedResult.fundSource in fundSources) {
+                fundSource = initialParsedResult.fundSource
+            }
+            if (initialParsedResult.volume > 0) {
+                volumeQtyText = if (initialParsedResult.volume % 1.0 == 0.0) initialParsedResult.volume.toInt().toString() else initialParsedResult.volume.toString()
+            }
+            if (initialParsedResult.unitName.isNotBlank()) {
+                unitText = initialParsedResult.unitName
+            }
+            if (initialParsedResult.unitPrice > 0) {
+                unitPriceText = initialParsedResult.unitPrice.toLong().toString()
+            } else if (initialParsedResult.amount > 0) {
+                unitPriceText = initialParsedResult.amount.toLong().toString()
+            }
+            if (initialParsedResult.notes.isNotBlank()) {
+                notes = initialParsedResult.notes
+            }
+        }
+    }
 
     var expandedFundDropdown by remember { mutableStateOf(false) }
 
@@ -213,6 +250,83 @@ fun TransactionEntryScreen(
                 }
             }
 
+            // Hero Voice Input Banner
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFEFF6FF)
+                ),
+                border = BorderStroke(1.dp, Color(0xFF93C5FD)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showVoiceDialog = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF2563EB),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Mic,
+                                contentDescription = "Input Suara",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Input Kas Cepat dengan Suara",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = Color(0xFF1E40AF)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFDBEAFE)
+                            ) {
+                                Text(
+                                    text = "Voice API",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF1D4ED8),
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Ucapkan belanja & harga, sistem otomatis mengisi uraian, volume, satuan, dan total kas.",
+                            fontSize = 11.sp,
+                            color = Color(0xFF2563EB),
+                            lineHeight = 15.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF2563EB)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Bicara", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+
             // Transaction Type Toggle (Pengeluaran vs Pemasukan)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -302,6 +416,15 @@ fun TransactionEntryScreen(
                         if (type == "PEMASUKAN") "Contoh: Penerimaan Dana BOS Reguler Tahap 1"
                         else "Contoh: Pembelian Kertas HVS & ATK Kantor"
                     )
+                },
+                trailingIcon = {
+                    IconButton(onClick = { showVoiceDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Bicara untuk mengisi transaksi",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -700,5 +823,61 @@ fun TransactionEntryScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (showVoiceDialog) {
+        VoiceTransactionDialog(
+            availableFundSources = fundSources,
+            onDismiss = { showVoiceDialog = false },
+            onApplyToForm = { result ->
+                title = result.title
+                type = result.type
+                if (result.fundSource in fundSources) {
+                    fundSource = result.fundSource
+                }
+                if (result.volume > 0) {
+                    volumeQtyText = if (result.volume % 1.0 == 0.0) result.volume.toInt().toString() else result.volume.toString()
+                }
+                if (result.unitName.isNotBlank()) {
+                    unitText = result.unitName
+                }
+                if (result.unitPrice > 0) {
+                    unitPriceText = result.unitPrice.toLong().toString()
+                } else if (result.amount > 0) {
+                    unitPriceText = result.amount.toLong().toString()
+                }
+                if (result.notes.isNotBlank()) {
+                    notes = result.notes
+                }
+            },
+            onDirectSave = { result ->
+                val proofSummary = "Kwitansi: Ada | Nota: Ada"
+                val parts = listOf(result.notes, proofSummary).filter { it.isNotBlank() }
+                val finalNotes = parts.joinToString(" • ")
+
+                val rawUnit = result.unitName.trim()
+                val isIncome = result.type == "PEMASUKAN"
+                val isRupiahOrNum = rawUnit.startsWith("Rp", ignoreCase = true) || rawUnit.matches(Regex("^[0-9.,\\s]+$"))
+                val cleanUnit = if (isRupiahOrNum || rawUnit.isBlank()) {
+                    if (isIncome) "transaksi" else "buah"
+                } else {
+                    rawUnit
+                }
+
+                onSubmitTransaction(
+                    result.title.trim().ifBlank { if (result.type == "PEMASUKAN") "Penerimaan Kas" else "Pengeluaran Kas" },
+                    result.amount,
+                    result.type,
+                    result.fundSource,
+                    result.category,
+                    result.volume,
+                    cleanUnit,
+                    result.unitPrice,
+                    finalNotes,
+                    proofSummary,
+                    selectedDateMillis
+                )
+            }
+        )
     }
 }

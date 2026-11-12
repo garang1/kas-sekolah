@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -94,6 +95,7 @@ fun SchoolAccountDialog(
     onRenameFundSource: (oldName: String, newName: String) -> Unit = { _, _ -> },
     onSyncAllToGoogleSheets: () -> Unit = {},
     onFetchFromGoogleSheets: () -> Unit = {},
+    onExportJsonFile: () -> Unit = {},
     onBackupData: (android.net.Uri) -> Unit = {},
     onRestoreData: (android.net.Uri) -> Unit = {}
 ) {
@@ -278,8 +280,41 @@ fun SchoolAccountDialog(
                             )
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                Text("Pencadangan Data", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountBalanceWallet,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Pencadangan Database Room (JSON)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Ekspor seluruh catatan kas dan profil sekolah ke file JSON lokal untuk disimpan di Download HP atau dibagikan.",
+                                    fontSize = 11.sp,
+                                    color = Color.DarkGray
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Tombol Utama: Ekspor & Bagikan Langsung
+                                Button(
+                                    onClick = onExportJsonFile,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669))
+                                ) {
+                                    Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Ekspor & Bagikan File JSON (Download)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -288,25 +323,21 @@ fun SchoolAccountDialog(
                                         onClick = { backupLauncher.launch("bku_backup_${System.currentTimeMillis()}.json") },
                                         modifier = Modifier.weight(1f),
                                         shape = RoundedCornerShape(10.dp),
-                                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary
-                                        )
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                     ) {
-                                        Icon(imageVector = androidx.compose.material.icons.Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Icon(imageVector = Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Backup", fontSize = 11.sp)
+                                        Text("Pilih Folder", fontSize = 11.sp)
                                     }
                                     Button(
                                         onClick = { restoreLauncher.launch(arrayOf("application/json", "*/*")) },
                                         modifier = Modifier.weight(1f),
                                         shape = RoundedCornerShape(10.dp),
-                                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.secondary
-                                        )
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                                     ) {
-                                        Icon(imageVector = androidx.compose.material.icons.Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Icon(imageVector = Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Restore", fontSize = 11.sp)
+                                        Text("Pulihkan", fontSize = 11.sp)
                                     }
                                 }
                             }

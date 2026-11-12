@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
@@ -34,6 +35,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -92,7 +94,8 @@ fun DashboardScreen(
     onNavigateToApproval: () -> Unit = {},
     onViewReceipt: (TransactionEntity) -> Unit = {},
     onEditTransaction: (TransactionEntity) -> Unit = {},
-    onDeleteTransaction: (TransactionEntity) -> Unit = {}
+    onDeleteTransaction: (TransactionEntity) -> Unit = {},
+    onOpenVoiceInput: () -> Unit = {}
 ) {
     val activeSources = if (fundSources.isNotEmpty()) fundSources else fundBalances.map { it.fundSource }.ifEmpty { FundSourceDefaults.SOURCES }
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
@@ -344,6 +347,29 @@ fun DashboardScreen(
                 }
             )
         }
+
+        // Floating Action Button: Input Kas Berbasis Suara
+        ExtendedFloatingActionButton(
+            onClick = onOpenVoiceInput,
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Input Transaksi Suara"
+                )
+            },
+            text = {
+                Text(
+                    text = "Input Suara",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            },
+            containerColor = Color(0xFF2563EB),
+            contentColor = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        )
     }
 }
 

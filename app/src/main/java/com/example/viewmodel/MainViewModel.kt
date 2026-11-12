@@ -31,6 +31,9 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private data class PagingQueryParam(
     val fund: String,
@@ -902,43 +905,121 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportDatabaseToJson(context: android.content.Context, shareImmediately: Boolean = true) {
+        viewModelScope.launch {
+            _eventFlow.emit(UiEvent.ShowToast("Mengekspor database Room ke file JSON..."))
+            try {
+                // Ambil semua transaksi langsung dari Room DAO secara sinkron di background IO
+                val allTxs = withContext(Dispatchers.IO) {
+                    repository.getAllTransactionsSync()
+                }
+                val profile = schoolProfile.value
+                val sources = customFundSources.value
+
+                val totalInc = allTxs.filter { it.type == "PEMASUKAN" }.sumOf { it.amount }
+                val totalExp = allTxs.filter { it.type == "PENGELUARAN" }.sumOf { it.amount }
+                val balance = totalInc - totalExp
+
+                val dateFormat = SimpleDateFormat("dd MMMM yyyy HH:mm:ss", Locale("id", "ID"))
+                val summary = com.example.data.model.BackupSummary(
+                    totalTransactions = allTxs.size,
+                    totalIncome = totalInc,
+                    totalExpense = totalExp,
+                    balance = balance,
+                    exportDateFormatted = dateFormat.format(Date())
+                )
+
+                val backupData = com.example.data.model.AppBackupData(
+                    version = 2,
+                    timestamp = System.currentTimeMillis(),
+                    appVersion = "7.0",
+                    schoolProfile = profile,
+                    transactions = allTxs,
+                    customFundSources = sources,
+                    summary = summary
+                )
+
+                val result = BackupRestoreHelper.exportDatabaseToJsonFile(context, backupData, shareImmediately)
+                if (result.isSuccess) {
+                    val file = result.getOrNull()
+                    _eventFlow.emit(UiEvent.ShowToast("Berhasil ekspor JSON ke Folder Download:\n${file?.name}"))
+                } else {
+                    _eventFlow.emit(UiEvent.ShowToast("Gagal ekspor JSON: ${result.exceptionOrNull()?.localizedMessage}"))
+                }
+            } catch (e: Exception) {
+                _eventFlow.emit(UiEvent.ShowToast("Error ekspor JSON: ${e.localizedMessage}"))
+            }
+        }
+    }
+
     fun backupData(context: android.content.Context, uri: android.net.Uri) {
         viewModelScope.launch {
             _eventFlow.emit(UiEvent.ShowToast("Memulai pencadangan data..."))
-            val backupData = com.example.data.model.AppBackupData(
-                timestamp = System.currentTimeMillis(),
-                schoolProfile = schoolProfile.value,
-                transactions = allTransactions.value
-            )
-            val success = BackupRestoreHelper.backupDataToUri(context, uri, backupData)
-            if (success) {
-                _eventFlow.emit(UiEvent.ShowToast("Pencadangan Berhasil Disimpan!"))
-            } else {
-                _eventFlow.emit(UiEvent.ShowToast("Gagal melakukan pencadangan data."))
+            try {
+                val allTxs = withContext(Dispatchers.IO) {
+                    repository.getAllTransactionsSync()
+                }
+                val profile = schoolProfile.value
+                val sources = customFundSources.value
+
+                val totalInc = allTxs.filter { it.type == "PEMASUKAN" }.sumOf { it.amount }
+                val totalExp = allTxs.filter { it.type == "PENGELUARAN" }.sumOf { it.amount }
+                val balance = totalInc - totalExp
+
+                val dateFormat = SimpleDateFormat("dd MMMM yyyy HH:mm:ss", Locale("id", "ID"))
+                val summary = com.example.data.model.BackupSummary(
+                    totalTransactions = allTxs.size,
+                    totalIncome = totalInc,
+                    totalExpense = totalExp,
+                    balance = balance,
+                    exportDateFormatted = dateFormat.format(Date())
+                )
+
+                val backupData = com.example.data.model.AppBackupData(
+                    version = 2,
+                    timestamp = System.currentTimeMillis(),
+                    appVersion = "7.0",
+                    schoolProfile = profile,
+                    transactions = allTxs,
+                    customFundSources = sources,
+                    summary = summary
+                )
+                val success = BackupRestoreHelper.backupDataToUri(context, uri, backupData)
+                if (success) {
+                    _eventFlow.emit(UiEvent.ShowToast("Pencadangan Berhasil Disimpan ke File JSON!"))
+                } else {
+                    _eventFlow.emit(UiEvent.ShowToast("Gagal melakukan pencadangan data."))
+                }
+            } catch (e: Exception) {
+                _eventFlow.emit(UiEvent.ShowToast("Gagal pencadangan: ${e.localizedMessage}"))
             }
         }
     }
 
     fun restoreData(context: android.content.Context, uri: android.net.Uri) {
         viewModelScope.launch {
-            _eventFlow.emit(UiEvent.ShowToast("Membaca file cadangan..."))
+            _eventFlow.emit(UiEvent.ShowToast("Membaca file cadangan JSON..."))
             val backupData = BackupRestoreHelper.restoreDataFromUri(context, uri)
             if (backupData != null) {
                 // Update profile
                 updateSchoolProfile(backupData.schoolProfile)
                 
-                // Clear existing transactions and insert new ones
+                // Pulihkan pos sumber dana jika tersedia
+                if (backupData.customFundSources.isNotEmpty()) {
+                    updateFundSources(backupData.customFundSources)
+                }
+
+                // Hapus transaksi saat ini dan masukkan data yang dipulihkan
                 repository.deleteAllTransactions()
                 backupData.transactions.forEach { t ->
-                    // Reset ID to avoid constraint failures, or keep existing IDs to preserve order
                     val newT = t.copy(id = 0)
                     repository.insertTransaction(newT)
                 }
                 
-                _eventFlow.emit(UiEvent.ShowToast("Restorasi Berhasil! Data telah dipulihkan."))
+                _eventFlow.emit(UiEvent.ShowToast("Restorasi Berhasil! ${backupData.transactions.size} transaksi dipulihkan."))
                 triggerAutoSyncIfConfigured()
             } else {
-                _eventFlow.emit(UiEvent.ShowToast("Gagal memulihkan data. File tidak valid atau rusak."))
+                _eventFlow.emit(UiEvent.ShowToast("Gagal memulihkan data. File JSON tidak valid atau rusak."))
             }
         }
     }

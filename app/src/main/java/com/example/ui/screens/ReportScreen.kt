@@ -99,6 +99,7 @@ fun ReportScreen(
     spreadsheetDocUrl: String = "",
     onSaveGoogleSheetsUrl: (String, String) -> Unit = { _, _ -> },
     onExportCsv: (Context, String?) -> Unit = { _, _ -> },
+    onExportJson: (Context) -> Unit = {},
     onSyncAllToGoogleSheets: () -> Unit = {},
     onFetchFromGoogleSheets: () -> Unit = {},
     onDeleteAllData: () -> Unit = {},
@@ -305,52 +306,79 @@ fun ReportScreen(
                 onSaveGoogleSheetsUrl = onSaveGoogleSheetsUrl
             )
         } else {
-        // Action Row: Ekspor CSV, Cetak PDF, & Reset Data
-        Row(
+        // Action Buttons: Ekspor CSV, Backup JSON, Cetak PDF, & Reset Kas
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(
-                onClick = { onExportCsv(context, selectedFundSource) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                modifier = Modifier.weight(1f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = "Ekspor CSV",
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Ekspor CSV", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = { onExportCsv(context, selectedFundSource) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Ekspor CSV",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Ekspor CSV", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = { onExportJson(context) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Backup JSON",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Backup JSON", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
-            Button(
-                onClick = { generateAndPrintPdf() },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED)),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
-                modifier = Modifier.weight(1f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.PictureAsPdf,
-                    contentDescription = "Cetak PDF",
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Cetak PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
+                Button(
+                    onClick = { generateAndPrintPdf() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED)),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PictureAsPdf,
+                        contentDescription = "Cetak PDF",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Cetak PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
 
-            Button(
-                onClick = { showDeleteAllConfirmDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                modifier = Modifier.weight(0.9f)
-            ) {
-                Text("Reset", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Button(
+                    onClick = { showDeleteAllConfirmDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.weight(0.7f)
+                ) {
+                    Text("Reset Kas", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 

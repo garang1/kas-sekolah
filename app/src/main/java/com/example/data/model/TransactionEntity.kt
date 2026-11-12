@@ -25,6 +25,7 @@ data class TransactionEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
+@JsonClass(generateAdapter = true)
 data class FundSourceModel(
     val name: String,
     val isSecret: Boolean = false // Jika true, hanya bisa dilihat & dikelola oleh Kepala Sekolah, offline di HP (tidak sync Google Sheet)
