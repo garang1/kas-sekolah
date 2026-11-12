@@ -66,20 +66,48 @@ object VoiceTransactionParser {
             )
         }
 
-        val lower = trimmed.lowercase()
+        // Normalisasi kata bilangan bahasa Indonesia ke angka terstruktur
+        val normalizedText = normalizeSpokenNumberWords(trimmed)
+        val lower = normalizedText.lowercase()
 
         // 1. Deteksi Jenis Kas (Pemasukan vs Pengeluaran)
-        val isIncome = lower.contains("terima") ||
-                lower.contains("penerimaan") ||
-                lower.contains("masuk") ||
+        val hasExplicitExpense = lower.contains("dana keluar") ||
+                lower.contains("pengeluaran") ||
+                lower.contains("belanja") ||
+                lower.contains("beli ") ||
+                lower.startsWith("beli") ||
+                lower.contains("bayar") ||
+                lower.contains("ongkos") ||
+                lower.contains("konsumsi") ||
+                lower.contains("honor") ||
+                lower.contains("perbaikan") ||
+                lower.contains("servis") ||
+                lower.contains("service") ||
+                lower.contains("fotocopy") ||
+                lower.contains("foto copy") ||
+                lower.contains("langganan")
+
+        val hasExplicitIncome = lower.contains("dana masuk") ||
                 lower.contains("pemasukan") ||
-                lower.contains("cair") ||
+                lower.contains("penerimaan") ||
+                lower.contains("terima dana") ||
+                lower.contains("terima kas") ||
+                lower.contains("dapat transfer") ||
+                lower.contains("transfer masuk") ||
+                lower.contains("cair dana") ||
                 lower.contains("pencairan") ||
                 lower.contains("hibah") ||
                 lower.contains("sumbangan") ||
-                lower.contains("tarik tunai") ||
-                lower.contains("transfer masuk") ||
-                lower.contains("saldo awal")
+                lower.contains("saldo awal") ||
+                lower.contains("tarik tunai")
+
+        val isIncome = when {
+            lower.startsWith("pemasukan") || lower.startsWith("dana masuk") || lower.startsWith("penerimaan") || lower.startsWith("terima") -> true
+            lower.startsWith("pengeluaran") || lower.startsWith("dana keluar") || lower.startsWith("beli") || lower.startsWith("belanja") || lower.startsWith("bayar") -> false
+            hasExplicitExpense && !hasExplicitIncome -> false
+            hasExplicitIncome && !hasExplicitExpense -> true
+            else -> hasExplicitIncome
+        }
         val type = if (isIncome) "PEMASUKAN" else "PENGELUARAN"
 
         // 2. Deteksi Sumber Dana
@@ -92,7 +120,7 @@ object VoiceTransactionParser {
         val (unitPrice, totalAmount) = detectPrices(lower, detectedVolume)
 
         // 5. Ekstraksi Judul / Uraian Transaksi yang Bersih
-        val cleanTitle = extractCleanTitle(trimmed, lower, detectedUnit, fundSource, type)
+        val cleanTitle = extractCleanTitle(normalizedText, lower, detectedUnit, fundSource, type)
 
         return ParsedTransactionResult(
             title = cleanTitle,
@@ -106,6 +134,63 @@ object VoiceTransactionParser {
             unitPrice = unitPrice,
             rawSpokenText = trimmed
         )
+    }
+
+    /**
+     * Mengubah kata-kata bilangan lisan Indonesia ke angka agar mudah dianalisis secara akurat.
+     */
+    private fun normalizeSpokenNumberWords(input: String): String {
+        var s = input
+
+        // Angka nominal jutaan
+        s = s.replace("(?i)\\bdua puluh lima juta\\b".toRegex(), "25 juta")
+        s = s.replace("(?i)\\btiga puluh lima juta\\b".toRegex(), "35 juta")
+        s = s.replace("(?i)\\btiga puluh juta\\b".toRegex(), "30 juta")
+        s = s.replace("(?i)\\bdua puluh juta\\b".toRegex(), "20 juta")
+        s = s.replace("(?i)\\blima belas juta\\b".toRegex(), "15 juta")
+        s = s.replace("(?i)\\bsepuluh juta\\b".toRegex(), "10 juta")
+        s = s.replace("(?i)\\blima juta\\b".toRegex(), "5 juta")
+        s = s.replace("(?i)\\bempat juta\\b".toRegex(), "4 juta")
+        s = s.replace("(?i)\\btiga juta\\b".toRegex(), "3 juta")
+        s = s.replace("(?i)\\bdua juta\\b".toRegex(), "2 juta")
+        s = s.replace("(?i)\\bsatu juta\\b".toRegex(), "1 juta")
+        s = s.replace("(?i)\\bsetengah juta\\b".toRegex(), "500 ribu")
+
+        // Angka nominal ribuan
+        s = s.replace("(?i)\\bseratus lima puluh ribu\\b".toRegex(), "150 ribu")
+        s = s.replace("(?i)\\bdua ratus lima puluh ribu\\b".toRegex(), "250 ribu")
+        s = s.replace("(?i)\\btujuh puluh lima ribu\\b".toRegex(), "75 ribu")
+        s = s.replace("(?i)\\bdua puluh lima ribu\\b".toRegex(), "25 ribu")
+        s = s.replace("(?i)\\blima puluh ribu\\b".toRegex(), "50 ribu")
+        s = s.replace("(?i)\\bempat puluh ribu\\b".toRegex(), "40 ribu")
+        s = s.replace("(?i)\\btiga puluh ribu\\b".toRegex(), "30 ribu")
+        s = s.replace("(?i)\\bdua puluh ribu\\b".toRegex(), "20 ribu")
+        s = s.replace("(?i)\\blima belas ribu\\b".toRegex(), "15 ribu")
+        s = s.replace("(?i)\\bsepuluh ribu\\b".toRegex(), "10 ribu")
+        s = s.replace("(?i)\\bsembilan ribu\\b".toRegex(), "9 ribu")
+        s = s.replace("(?i)\\bdelapan ribu lima ratus\\b".toRegex(), "8500")
+        s = s.replace("(?i)\\bdelapan ribu\\b".toRegex(), "8 ribu")
+        s = s.replace("(?i)\\btujuh ribu\\b".toRegex(), "7 ribu")
+        s = s.replace("(?i)\\benam ribu\\b".toRegex(), "6 ribu")
+        s = s.replace("(?i)\\blima ribu\\b".toRegex(), "5 ribu")
+        s = s.replace("(?i)\\bempat ribu\\b".toRegex(), "4 ribu")
+        s = s.replace("(?i)\\btiga ribu\\b".toRegex(), "3 ribu")
+        s = s.replace("(?i)\\bdua ribu\\b".toRegex(), "2 ribu")
+        s = s.replace("(?i)\\bseribu\\b".toRegex(), "1 ribu")
+
+        s = s.replace("(?i)\\blima ratus ribu\\b".toRegex(), "500 ribu")
+        s = s.replace("(?i)\\bempat ratus ribu\\b".toRegex(), "400 ribu")
+        s = s.replace("(?i)\\btiga ratus ribu\\b".toRegex(), "300 ribu")
+        s = s.replace("(?i)\\bdua ratus ribu\\b".toRegex(), "200 ribu")
+        s = s.replace("(?i)\\bseratus ribu\\b".toRegex(), "100 ribu")
+
+        // Tahap termin
+        s = s.replace("(?i)\\btahap satu\\b".toRegex(), "tahap 1")
+        s = s.replace("(?i)\\btahap dua\\b".toRegex(), "tahap 2")
+        s = s.replace("(?i)\\btahap tiga\\b".toRegex(), "tahap 3")
+        s = s.replace("(?i)\\btahap empat\\b".toRegex(), "tahap 4")
+
+        return s
     }
 
     private fun detectFundSource(lowerText: String, availableFundSources: List<String>): String {
@@ -301,8 +386,8 @@ object VoiceTransactionParser {
     ): String {
         var cleaned = originalText
 
-        // Hapus frasa pembuka perintah
-        cleaned = cleaned.replace("(?i)^(?:tolong\\s+)?(?:catatkan?|masukkan?|input(?:kan)?)\\s+".toRegex(), "")
+        // Hapus frasa pembuka perintah / jenis dana
+        cleaned = cleaned.replace("(?i)^(?:dana\\s*(?:masuk|keluar)|pemasukan|pengeluaran|tolong\\s+catatkan?|catatkan?|masukkan?|input(?:kan)?)\\s+".toRegex(), "")
 
         // Hapus keterangan dana di akhir (contoh: "dari BOS Reguler", "sumber BOS Kinerja", "dana komite")
         cleaned = cleaned.replace("(?i)\\s*(?:dari|sumber|dana|pos)?\\s*(?:bos\\s*(?:reguler|kinerja|da)?|dana\\s*komite|hibah|lainnya).*$".toRegex(), "")

@@ -166,7 +166,7 @@ fun AppLockScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "Kas Simapas",
+                        text = "Kas Segitiga",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface

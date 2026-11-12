@@ -412,15 +412,30 @@ fun VoiceTransactionDialog(
 
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = if (isIncome) Color(0xFF059669) else Color(0xFFDC2626)
+                                    color = if (isIncome) Color(0xFF059669) else Color(0xFFDC2626),
+                                    modifier = Modifier.clickable {
+                                        val newType = if (result.type == "PENGELUARAN") "PEMASUKAN" else "PENGELUARAN"
+                                        parsedResult = result.copy(type = newType)
+                                    }
                                 ) {
-                                    Text(
-                                        text = result.type,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = result.type,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 10.sp
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "⇄",
+                                            color = Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
                                 }
                             }
 
@@ -464,24 +479,30 @@ fun VoiceTransactionDialog(
                                 }
                             }
 
-                            // Sumber Dana
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            // Sumber Dana Pilihan Cepat
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("Buku Kas / Sumber Dana:", fontSize = 11.sp, color = Color.Gray)
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.surface,
-                                    border = BorderStroke(1.dp, Color.LightGray)
-                                ) {
-                                    Text(
-                                        text = result.fundSource,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
+                                val sourcesList = if (availableFundSources.isNotEmpty()) availableFundSources else listOf("BOS Reguler", "BOS Kinerja", "Dana Komite", "Hibah / Lainnya")
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(sourcesList) { source ->
+                                        val isSelected = result.fundSource.equals(source, ignoreCase = true)
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.LightGray),
+                                            modifier = Modifier.clickable {
+                                                parsedResult = result.copy(fundSource = source)
+                                            }
+                                        ) {
+                                            Text(
+                                                text = source,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else Color.DarkGray,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
 

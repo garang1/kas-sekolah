@@ -699,7 +699,7 @@ fun SchoolAccountDialog(
                     // TAB 3: TENTANG & LISENSI APLIKASI
                     3 -> {
                         AboutScreen(
-                            appName = "Kas Simapas",
+                            appName = "Kas Segitiga",
                             npsn = schoolProfile.npsn
                         )
                     }

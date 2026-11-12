@@ -7,7 +7,7 @@ import org.junit.Test
 
 class VoiceTransactionParserTest {
 
-    private val sampleFundSources = listOf("BOS Reguler", "BOS Kinerja", "Dana Komite", "Hibah / Lainnya")
+    private val sampleFundSources = listOf("BOS Reguler", "BOS Kinerja", "Dana Komite", "Hibah / Lainnya", "BOSDA Provinsi")
 
     @Test
     fun testParsePurchaseWithVolumeAndUnitPrice() {
@@ -49,14 +49,40 @@ class VoiceTransactionParserTest {
     }
 
     @Test
-    fun testParseSimpleExpense() {
-        val input = "Perbaikan printer kantor 150 ribu dana komite"
+    fun testDanaKeluarPrefix() {
+        val input = "Dana keluar belanja perlengkapan kebersihan 4 botol harga 25 ribu dari BOS Reguler"
         val result = VoiceTransactionParser.parse(input, sampleFundSources)
 
         assertEquals("PENGELUARAN", result.type)
+        assertEquals("BOS Reguler", result.fundSource)
+        assertEquals(4.0, result.volume, 0.001)
+        assertEquals("botol", result.unitName)
+        assertEquals(25000.0, result.unitPrice, 0.001)
+        assertEquals(100000.0, result.amount, 0.001)
+        assertTrue(result.title.contains("Perlengkapan Kebersihan", ignoreCase = true))
+    }
+
+    @Test
+    fun testDanaMasukPrefix() {
+        val input = "Dana masuk sumbangan paguyuban komite 3 juta"
+        val result = VoiceTransactionParser.parse(input, sampleFundSources)
+
+        assertEquals("PEMASUKAN", result.type)
         assertEquals("Dana Komite", result.fundSource)
-        assertEquals(150000.0, result.amount, 0.001)
-        assertEquals(1.0, result.volume, 0.001)
+        assertEquals(3000000.0, result.amount, 0.001)
+    }
+
+    @Test
+    fun testCustomFundSourceMatching() {
+        val input = "Beli buku teks panduan guru 10 buku harga 65 ribu dari BOSDA Provinsi"
+        val result = VoiceTransactionParser.parse(input, sampleFundSources)
+
+        assertEquals("PENGELUARAN", result.type)
+        assertEquals("BOSDA Provinsi", result.fundSource)
+        assertEquals(10.0, result.volume, 0.001)
+        assertEquals("buku", result.unitName)
+        assertEquals(65000.0, result.unitPrice, 0.001)
+        assertEquals(650000.0, result.amount, 0.001)
     }
 
     @Test
@@ -69,5 +95,17 @@ class VoiceTransactionParserTest {
         assertEquals("kotak", result.unitName)
         assertEquals(20000.0, result.unitPrice, 0.001)
         assertEquals(500000.0, result.amount, 0.001)
+    }
+
+    @Test
+    fun testPhotocopyExamPapers() {
+        val input = "Foto copy naskah ujian semester 500 lembar harga 300 rupiah"
+        val result = VoiceTransactionParser.parse(input, sampleFundSources)
+
+        assertEquals("PENGELUARAN", result.type)
+        assertEquals(500.0, result.volume, 0.001)
+        assertEquals("lembar", result.unitName)
+        assertEquals(300.0, result.unitPrice, 0.001)
+        assertEquals(150000.0, result.amount, 0.001)
     }
 }

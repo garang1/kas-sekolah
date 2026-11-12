@@ -1,15 +1,15 @@
-# 📱 Dokumentasi Aplikasi: Kas Simapas (Buku Kas Pintar)
+# 📱 Dokumentasi Aplikasi: Kas Segitiga (Buku Kas Pintar)
 
-**Kas Simapas** adalah aplikasi mobile berbasis Android yang dirancang khusus untuk mendigitalkan dan menyederhanakan tata kelola administrasi keuangan (Buku Kas Utama/BKU) di lingkungan instansi pendidikan (SD, SMP, SMA, maupun instansi swasta). 
+**Kas Segitiga** adalah aplikasi mobile berbasis Android yang dirancang khusus untuk mendigitalkan dan menyederhanakan tata kelola administrasi keuangan (Buku Kas Utama/BKU) di lingkungan instansi pendidikan (SD, SMP, SMA, maupun instansi swasta). 
 
 Aplikasi ini bertindak sebagai asisten pintar bagi **Bendahara** sekaligus panel pemantauan (*monitoring*) transparan bagi **Kepala Sekolah**, memastikan pengelolaan dana BOS, BOP, Komite, dan kas lainnya tercatat secara rapi, aman, dan dapat dipertanggungjawabkan (akuntabel).
 
 ---
 
-## 🌟 MANFAAT UTAMA MENGGUNAKAN KAS SIMAPAS
+## 🌟 MANFAAT UTAMA MENGGUNAKAN KAS SEGITIGA
 
 1. **Bebas Kertas & Bukti Nota yang Hilang (Paperless & Secure)**
-   Seringkali nota fisik pudar atau hilang sebelum masa audit (SPJ) tiba. Dengan Kas Simapas, Bendahara dapat langsung memotret nota/kuitansi dari HP saat transaksi terjadi. Bukti digital akan menempel selamanya pada rincian transaksi tersebut.
+   Seringkali nota fisik pudar atau hilang sebelum masa audit (SPJ) tiba. Dengan Kas Segitiga, Bendahara dapat langsung memotret nota/kuitansi dari HP saat transaksi terjadi. Bukti digital akan menempel selamanya pada rincian transaksi tersebut.
 2. **Transparansi Tanpa Jarak (Real-Time Sync)**
    Kepala Sekolah tidak perlu lagi menanyakan buku kas fisik kepada Bendahara. Berbekal fitur *Pairing Cloud*, Kepala Sekolah dapat melihat secara *live* setiap transaksi yang baru saja dientri oleh Bendahara dari HP-nya masing-masing.
 3. **Mencegah Defisit & Kesalahan Anggaran**
@@ -36,7 +36,17 @@ Fitur inovatif ini memungkinkan perangkat Bendahara dan Kepala Sekolah saling te
 *   Jika Bendahara berganti HP baru, mereka cukup menekan tombol *Restore*, dan sistem migrasi cerdas akan memulihkan data persis seperti sedia kala tanpa takut datanya rusak (corrupt) atau bocor ke sekolah lain.
 
 ### 4. 💼 Pos Dana Dinamis (Multipel Kas)
-Tidak seperti aplikasi kasir biasa yang mencampur semua uang dalam satu laci. Di Kas Simapas, uang dikelompokkan ke dalam "Kotak/Pos Dana" terpisah (misal: *BOS Reguler, Dana Komite, BOS Kinerja, Hibah*). Jika saldo BOS kosong, pengeluaran BOS akan ditolak, meskipun saldo di Dana Komite masih banyak.
+Tidak seperti aplikasi kasir biasa yang mencampur semua uang dalam satu laci. Di Kas Segitiga, uang dikelompokkan ke dalam "Kotak/Pos Dana" terpisah (misal: *BOS Reguler, Dana Komite, BOS Kinerja, Hibah*). Jika saldo BOS kosong, pengeluaran BOS akan ditolak, meskipun saldo di Dana Komite masih banyak.
 
-### 5. 📝 Laporan Ekspor CSV Otomatis (Format Resmi)
-Dengan satu sentuhan, aplikasi dapat mengekspor riwayat transaksi per bulan/tahap ke dalam bentuk CSV (bisa dibuka di Microsoft Excel). Format yang dihasilkan sudah menyesuaikan gaya Buku Kas Umum (BKU) standar lengkap dengan blok tanda tangan Kepala Sekolah (dengan NIP) dan Bendahara di bagian bawah laporan.
+### 5. 📝 Laporan Ekspor CSV & Cetak PDF Otomatis (Format Resmi)
+Dengan satu sentuhan, aplikasi dapat mengekspor riwayat transaksi per bulan/tahap ke dalam bentuk CSV (bisa dibuka di Microsoft Excel) atau Cetak PDF resmi ber-kop sekolah. Format yang dihasilkan sudah menyesuaikan gaya Buku Kas Umum (BKU) standar lengkap dengan blok tanda tangan Kepala Sekolah (dengan NIP) dan Bendahara di bagian bawah laporan.
+
+### 6. 🎙️ Input Transaksi Kas Cepat Berbasis Suara (Fitur Baru v7.0)
+Bendahara dapat mencatat kas secara instan hanya dengan berbicara dalam bahasa Indonesia:
+* Sistem otomatis mengekstrak uraian transaksi, kuantitas volume & satuan (rim, buah, kotak, lembar, dll.), serta menghitung perkalian harga satuan menjadi total nominal.
+* Mengenali jenis kas (Pemasukan vs Pengeluaran) serta mencocokkan ke pos buku kas (BOS Reguler, BOS Kinerja, Dana Komite, Hibah).
+* Contoh: *"Beli kertas HVS 5 rim harga 50 ribu per rim dari BOS Reguler"* langsung terisi otomatis.
+
+### 7. 💾 Ekspor & Pencadangan Database Room ke File JSON Lokal
+* Data kas dapat diekspor ke file JSON berindentasi rapi ke folder Downloads HP dengan 1 ketukan.
+* Terintegrasi dengan fitur Share Sheet Android untuk dibagikan langsung ke WhatsApp, Google Drive, atau Email.

@@ -1,6 +1,6 @@
 {
-  "name": "Kas Simapas",
-  "description": "Aplikasi Kas Simapas - Buku Kas Pintar Terintegrasi untuk SD Negeri 33/III Air Tenang (BOS, Komite, Arsip Nota & Laporan BKU)",
+  "name": "Kas Segitiga",
+  "description": "Aplikasi Kas Segitiga - Buku Kas Pintar Terintegrasi untuk SD Negeri 33/III Air Tenang (BOS, Komite, Arsip Nota & Laporan BKU)",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

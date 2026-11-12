@@ -71,7 +71,7 @@ import com.example.R
 @Composable
 fun AboutScreen(
     modifier: Modifier = Modifier,
-    appName: String = "Kas Simapas",
+    appName: String = "Kas Segitiga",
     npsn: String = "",
     developerName: String = "Opper Antoni",
     facebookUrl: String = "https://www.facebook.com/opper.antoni",
@@ -332,7 +332,7 @@ fun AboutScreenPreview() {
     MaterialTheme {
         Surface {
             AboutScreen(
-                appName = "Kas Simapas",
+                appName = "Kas Segitiga",
                 developerName = "Opper Antoni",
                 facebookUrl = "https://www.facebook.com/opper.antoni"
             )

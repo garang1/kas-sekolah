@@ -55,32 +55,32 @@ jobs:
       - name: Prepare APK for Release
         run: |
           mkdir -p release_apk
-          cp app/build/outputs/apk/debug/*.apk release_apk/Kas-Simapas-v7.0.apk
+          cp app/build/outputs/apk/debug/*.apk release_apk/Kas-Segitiga-v7.0.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kas-Simapas-APK
-          path: release_apk/Kas-Simapas-v7.0.apk
+          name: Kas-Segitiga-APK
+          path: release_apk/Kas-Segitiga-v7.0.apk
           if-no-files-found: error
 
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v7.0-${{ github.run_number }}"
-          name: "Kas Simapas v7.0 (Rilis #${{ github.run_number }})"
+          name: "Kas Segitiga v7.0 (Rilis #${{ github.run_number }})"
           body: |
-            ### 📱 Aplikasi Kas Simapas (Buku Kas Pintar)
+            ### 📱 Aplikasi Kas Segitiga (Buku Kas Pintar)
             File APK siap diinstal langsung ke perangkat HP Android (Kepala Sekolah & Bendahara).
             
             #### 📥 Panduan Instalasi:
-            1. Unduh file **Kas-Simapas-v7.0.apk** di bagian **Assets** di bawah.
+            1. Unduh file **Kas-Segitiga-v7.0.apk** di bagian **Assets** di bawah.
             2. Buka file di HP Android.
             3. Jika muncul peringatan keamanan, pilih **Setelan** lalu aktifkan **Izinkan dari sumber ini**.
             4. Klik **Instal**.
           draft: false
           prerelease: false
           make_latest: true
-          files: release_apk/Kas-Simapas-v7.0.apk
+          files: release_apk/Kas-Segitiga-v7.0.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

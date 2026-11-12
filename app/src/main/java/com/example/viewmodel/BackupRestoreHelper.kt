@@ -106,7 +106,7 @@ object BackupRestoreHelper {
                         )
 
                         val displayDateFormat = SimpleDateFormat("dd MMMM yyyy HH:mm", Locale("id", "ID"))
-                        val shareText = "📂 File Cadangan Database BKU Kas Simapas\n" +
+                        val shareText = "📂 File Cadangan Database BKU Kas Segitiga\n" +
                                 "🏫 Sekolah: ${backupData.schoolProfile.schoolName}\n" +
                                 "🔢 Total Transaksi: ${backupData.transactions.size} transaksi\n" +
                                 "📅 Tanggal Backup: ${displayDateFormat.format(Date(backupData.timestamp))}\n\n" +
